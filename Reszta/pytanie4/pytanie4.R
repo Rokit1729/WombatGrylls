@@ -1,0 +1,255 @@
+library(RMariaDB)
+library(ggplot2)
+con <- dbConnect(RMariaDB::MariaDB(),
+                 dbname = "team24",
+                 username = "team24",
+                 password = "te@mzaza",
+                 host = "giniewicz.it")
+
+
+
+
+
+#Średnia ocena wycieczki, podział na kierowników
+query <- "SELECT t2.id_pracownika,
+          FLOOR(AVG(t1.ocena)*100)/100 AS `srednia_ocena`
+          FROM osoby_zorganizowana_wycieczka AS t1
+          JOIN pracownicy_wycieczka AS t2 USING(id_wycieczki)
+          JOIN pracownicy AS t3 USING(id_pracownika)
+          JOIN stanowiska AS t4 USING(id_stanowiska)
+          WHERE t4.stanowisko = 'Koordynator wycieczki'
+          AND t1.ocena IS NOT NULL
+          GROUP BY t2.id_pracownika;"
+
+koordynator <- dbGetQuery(con, query)
+#View(koordynator)
+oceny_kor <- koordynator$srednia_ocena
+
+max_kor <- oceny_kor[1]
+min_kor <- oceny_kor[1]
+indeksy_max_kor <- 1
+indeksy_min_kor <- 1
+
+for(i in 2:length(oceny_kor)){
+  if(oceny_kor[i]==max_kor){
+    indeksy_max_kor <- c(indeksy_max_kor, i)
+  }
+  else if(oceny_kor[i]>max_kor){
+    max_kor <- oceny_kor[i]
+    indeksy_max_kor <- i
+  }
+  
+  if(oceny_kor[i]==min_kor){
+    indeksy_min_kor <- c(indeksy_min_kor, i)
+  }
+  else if(oceny_kor[i]<min_kor){
+    min_kor <- oceny_kor[i]
+    indeksy_min_kor <- i
+  }
+}
+
+kolory_kor <- c()
+for(i in 1:length(oceny_kor)){
+  if(i %in% indeksy_max_kor) kolory_kor <- c(kolory_kor, "green4")
+  else if(i %in% indeksy_min_kor) kolory_kor <- c(kolory_kor, "red4")
+  else kolory_kor <- c(kolory_kor, "lightblue3")
+}
+
+if(max_kor == min_kor) kolory_kor <- rep("lightblue3", length(oceny_kor))
+
+
+
+
+
+#Średnia ocena wycieczki, podział na fotografów
+query <- "SELECT t2.id_pracownika,
+          FLOOR(AVG(t1.ocena)*100)/100 AS `srednia_ocena`
+          FROM osoby_zorganizowana_wycieczka AS t1
+          JOIN pracownicy_wycieczka AS t2 USING(id_wycieczki)
+          JOIN pracownicy AS t3 USING(id_pracownika)
+          JOIN stanowiska AS t4 USING(id_stanowiska)
+          WHERE t4.stanowisko = 'Fotograf'
+          AND t1.ocena IS NOT NULL
+          GROUP BY t2.id_pracownika;"
+
+fotograf <- dbGetQuery(con, query)
+#View(fotograf)
+oceny_fot <- fotograf$srednia_ocena
+
+max_fot <- oceny_fot[1]
+min_fot <- oceny_fot[1]
+indeksy_max_fot <- 1
+indeksy_min_fot <- 1
+
+for(i in 2:length(oceny_fot)){
+  if(oceny_fot[i]==max_fot){
+    indeksy_max_fot <- c(indeksy_max_fot, i)
+  }
+  else if(oceny_fot[i]>max_fot){
+    max_fot <- oceny_fot[i]
+    indeksy_max_fot <- i
+  }
+  
+  if(oceny_fot[i]==min_fot){
+    indeksy_min_fot <- c(indeksy_min_fot, i)
+  }
+  else if(oceny_fot[i]<min_fot){
+    min_fot <- oceny_fot[i]
+    indeksy_min_fot <- i
+  }
+}
+
+kolory_fot <- c()
+for(i in 1:length(oceny_fot)){
+  if(i %in% indeksy_max_fot) kolory_fot <- c(kolory_fot, "green4")
+  else if(i %in% indeksy_min_fot) kolory_fot <- c(kolory_fot, "red4")
+  else kolory_fot <- c(kolory_fot, "lightblue3")
+}
+
+if(max_fot == min_fot) kolory_fot <- rep("lightblue3", length(oceny_fot))
+
+
+
+
+
+#Najlepsze średnie ocenianych wycieczek
+query <- "SELECT t1.id_wycieczki,
+          t2.id_oferty,
+          FLOOR(AVG(t1.ocena)*100)/100 AS `srednia_ocena_wycieczki`
+          FROM osoby_zorganizowana_wycieczka AS t1
+          JOIN zorganizowana_wycieczka AS t2 USING(id_wycieczki)
+          WHERE ocena IS NOT NULL
+          GROUP BY id_wycieczki
+          HAVING FLOOR(AVG(t1.ocena)*100)/100 = (SELECT FLOOR(AVG(ocena)*100)/100 AS `x`
+                                                  FROM osoby_zorganizowana_wycieczka
+                                                  WHERE ocena IS NOT NULL
+                                                  GROUP BY id_wycieczki
+                                                  ORDER BY `x` DESC
+                                                  LIMIT 1)
+          ORDER BY id_wycieczki;"
+
+najlepsze_wyc <- dbGetQuery(con, query)
+#View(najlepsze_wyc)
+najlepsze_wyc_ocena <- najlepsze_wyc[1, 2]      #jest tylko jedna najlepsza ocena
+najlepsze_wyc_indeksy <- najlepsze_wyc$id_wycieczki
+
+
+
+
+
+#Najgorsze średnie ocenianych wycieczek
+query <- "SELECT t1.id_wycieczki,
+          t2.id_oferty,
+          FLOOR(AVG(t1.ocena)*100)/100 AS `srednia_ocena_wycieczki`
+          FROM osoby_zorganizowana_wycieczka AS t1
+          JOIN zorganizowana_wycieczka AS t2 USING(id_wycieczki)
+          WHERE ocena IS NOT NULL
+          GROUP BY id_wycieczki
+          HAVING FLOOR(AVG(t1.ocena)*100)/100 = (SELECT FLOOR(AVG(ocena)*100)/100 AS `x`
+                                                  FROM osoby_zorganizowana_wycieczka
+                                                  WHERE ocena IS NOT NULL
+                                                  GROUP BY id_wycieczki
+                                                  ORDER BY `x` ASC
+                                                  LIMIT 1)
+          ORDER BY id_wycieczki;"
+
+najgorsze_wyc <- dbGetQuery(con, query)
+#View(najgorsze_wyc)
+najgorsze_wyc_ocena <- najgorsze_wyc[1, 2]      #jest tylko jedna najgorsza ocena
+najgorsze_wyc_indeksy <- najgorsze_wyc$id_wycieczki
+
+
+
+
+
+#Średnie oceny ofert
+query <- "SELECT t2.id_oferty,
+          FLOOR(AVG(t1.ocena)*100)/100 AS `srednia_ocena_ofert`
+          FROM osoby_zorganizowana_wycieczka AS t1
+          JOIN zorganizowana_wycieczka AS t2 USING (id_wycieczki)
+          WHERE t1.ocena IS NOT NULL
+          GROUP BY t2.id_oferty;"
+
+oferty <- dbGetQuery(con, query)
+#View(oferty)
+oceny_of <- oferty$srednia_ocena_ofert
+
+max_of <- oceny_of[1]
+min_of <- oceny_of[1]
+indeksy_max_of <- 1
+indeksy_min_of <- 1
+for(i in 2:length(oceny_of)){
+  if(oceny_of[i]==max_of){
+    indeksy_max_of <- c(indeksy_max_of, i)
+  }
+  else if(oceny_of[i]>max_of){
+    max_of <- oceny_of[i]
+    indeksy_max_of <- i
+  }
+  
+  if(oceny_of[i]==min_of){
+    indeksy_min_of <- c(indeksy_min_of, i)
+  }
+  else if(oceny_of[i]<min_of){
+    min_of <- oceny_of[i]
+    indeksy_min_of <- i
+  }
+}
+
+kolory_of <- c()
+for(i in 1:length(oceny_of)){
+  if(i %in% indeksy_max_of) kolory_of <- c(kolory_of, "green4")
+  else if(i %in% indeksy_min_of) kolory_of <- c(kolory_of, "red4")
+  else kolory_of <- c(kolory_of, "lightblue3")
+}
+
+if(max_of == min_of) kolory_of <- rep("lightblue3", length(oceny_of))
+
+
+
+
+
+#WYKRESY
+#1
+barplot(oceny_kor, col = kolory_kor,
+        xlab="ID pracownika koordynatora", ylab = "Średnia ocena",
+        main = "Średnie oceny koordynatorów",
+        names.arg = koordynator$id_pracownika)
+legend("right",
+       legend = c(paste0("Najlepsza ocena: ", max_kor), paste0("Najgorsza ocena: ", min_kor), "Pozostałe oceny"),
+       fill = c("green4", "red4", "lightblue3"))
+
+#2
+barplot(oceny_fot, col = kolory_fot,
+        xlab="ID pracownika fotografa", ylab = "Średnia ocena",
+        main = "Średnie oceny fotografów",
+        names.arg = fotograf$id_pracownika)
+legend("right",
+       legend = c(paste0("Najlepsza ocena: ", max_fot), paste0("Najgorsza ocena: ", min_fot), "Pozostałe oceny"),
+       fill = c("green4", "red4", "lightblue3"))
+
+#3
+barplot(oceny_of, col = kolory_of,
+        xlab="ID oferty", ylab = "Średnia ocena",
+        main = "Średnia ocena ofert",
+        names.arg = oferty$id_oferty)
+legend("right",
+       legend = c(paste0("Najlepsza ocena: ", max_of), paste0("Najgorsza ocena: ", min_of), "Pozostałe oceny"),
+       fill = c("green4", "red4", "lightblue3"))
+
+#Najgorsze wycieczki
+View(najgorsze_wyc)
+
+#Najlepsze wycieczki
+View(najlepsze_wyc)
+
+ggplot(oferty, aes(x = id_oferty, y = srednia_ocena_ofert)) +
+  geom_col(fill = kolory_of) +
+  labs(title = "Liczba obsłużonych klientów w każdym miesiącu działalności firmy",
+       x = "ID oferty",
+       y = "Średnia ocena")+
+  scale_x_continuous(breaks=as.numeric(oferty$id_oferty)) +
+  scale_y_continuous(labels = scales::comma) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+dbDisconnect(con)
