@@ -1,0 +1,308 @@
+---
+title: "Dokumentacja projektu grupy C"
+author: Wiktor Niedźwiedzki, Dawid Skowroński, Jakub Wiszniewski, Mateusz Broczkowski,
+  Filip Michewicz
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    number_section: true
+    toc: true
+    toc_depth: 3
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE)
+```
+
+```{r wczytanie_danych}
+library(RMariaDB)
+library(knitr)
+
+con <- dbConnect(RMariaDB::MariaDB(),
+                 dbname = "team24",
+                 username = "team24",
+                 password = "te@mzaza",
+                 host = "giniewicz.it")
+
+query <- "SELECT * FROM stanowiska LIMIT 5;"
+stanowiska <- dbGetQuery(con, query)
+
+query <- "SELECT * FROM pracownicy LIMIT 5;"
+pracownicy <- dbGetQuery(con, query)
+
+query <- "SELECT * FROM urlopy LIMIT 5;"
+urlopy <- dbGetQuery(con, query)
+
+query <- "SELECT * FROM osoby LIMIT 5;"
+osoby <- dbGetQuery(con, query)
+
+query <- "SELECT * FROM dane_alarmowe LIMIT 5;"
+dane_alarmowe <- dbGetQuery(con, query)
+
+query <- "SELECT * FROM oferty LIMIT 5;"
+oferty <- dbGetQuery(con, query)
+
+query <- "SELECT * FROM kierunki LIMIT 5;"
+kierunki <- dbGetQuery(con, query)
+
+query <- "SELECT * FROM miasta LIMIT 5;"
+miasta <- dbGetQuery(con, query)
+
+query <- "SELECT * FROM rodzaje LIMIT 5;"
+rodzaje <- dbGetQuery(con, query)
+
+query <- "SELECT * FROM cennik LIMIT 5;"
+cennik <- dbGetQuery(con, query)
+
+query <- "SELECT * FROM zorganizowana_wycieczka LIMIT 5;"
+zorganizowana_wycieczka <- dbGetQuery(con, query)
+
+query <- "SELECT * FROM osoby_zorganizowana_wycieczka LIMIT 5;"
+osoby_zorganizowana_wycieczka <- dbGetQuery(con, query)
+
+query <- "SELECT * FROM pracownicy_wycieczka ORDER BY id_wycieczki LIMIT 5;"
+pracownicy_wycieczka <- dbGetQuery(con, query)
+
+dbDisconnect(con)
+```
+# Użyte technologie
+
+## Python
+
+- **numpy** – biblioteka Pythona do obliczeń numerycznych, oferująca wszechstronny typ danych `ndarray`, który umożliwia szybkie i wydajne operacje na dużych zbiorach danych, w tym macierzach i wektorach.
+- **math** – moduł standardowy Pythona zawierający funkcje matematyczne, takie jak `sin`, `cos`, `sqrt` i inne, przydatne w obliczeniach numerycznych i algorytmicznych.
+- **random** – moduł Pythona służący do generowania liczb losowych. Umożliwia tworzenie liczb zmiennoprzecinkowych, liczb całkowitych oraz wybieranie losowych elementów z kolekcji.
+- **pandas** – biblioteka Pythona do manipulacji i analizy danych, która wprowadza struktury danych takie jak `DataFrame` oraz `Series`, umożliwiając wygodne operowanie na danych tabelarycznych.
+- **datetime** – moduł Pythona umożliwiający pracę z datami i czasem. Oferuje klasy i funkcje do operacji na datach, czasach i przedziałach czasowych.
+- **faker** – biblioteka Pythona służąca do generowania sztucznych danych, takich jak imiona, adresy, numery telefonów, które mogą być używane do testowania aplikacji lub generowania danych w aplikacjach wideo.
+- **mysql.connector** – oficjalny moduł Pythona umożliwiający łączenie się z bazami danych MySQL. Umożliwia wykonywanie zapytań, wstawianie danych oraz zarządzanie bazą danych w aplikacjach Pythonowych.
+- **csv** – biblioteka Pythona do szybkiej i wygodnej manipulacji plikami CSV, zoptymalizowana pod kątem dużych zbiorów danych. Umożliwia łatwe odczytywanie, zapisywanie i analizowanie plików CSV.
+
+## MariaDB
+
+## RStudio
+
+- **RMariaDB** – biblioteka w języku R służąca do łączenia się i pracy z bazami danych MariaDB oraz MySQL. Pozwala na wykonywanie zapytań SQL, wstawianie, aktualizowanie i pobieranie danych.
+- **ggplot2** – biblioteka w języku R do tworzenia zaawansowanych wizualizacji danych. Bazuje na koncepcji gramatu wizualizacji i umożliwia tworzenie wykresów na podstawie danych w bardzo elastyczny sposób.
+- **dplyr** – biblioteka w języku R, która zapewnia narzędzia do manipulacji danymi. Wykorzystuje polecenia analogiczne do zapytań SQL.
+- **zoo** – biblioteka w języku R umożliwiająca pracę z czasowymi danymi szeregowymi, wspiera obliczenia na szeregach czasowych.
+- **knitr** – biblioteka w języku R wykorzystywana do generowania raportów w różnych formatach, takich jak HTML, PDF czy Word. Umożliwia tworzenie dynamicznych dokumentów.
+- **scales** – biblioteka w języku R, która dostarcza funkcje do manipulacji etykietami i formatami jednostek osi wykresów.
+- **stringr** - biblioteka w języku R służąca do pracy z danymi tekstowymi.
+
+## VS Code
+
+- **SQLTools MySQL/MariaDB/TiDB** - rozszerzenie, pozwalające wygodnie połączyć się z serwerem bazodanowym, używany do wysyłania zapytań
+- **ERD Editor** - rozszerzenie, dzięki któremu można tworzyć schemat baz danych oraz pobierać z niego kod generujący struktury tabel
+
+# Pliki
+
+- **jak_uruchomic.txt** - instrukcja poprawnej kolejności uruchamiania poszczególnych plików projektu
+- **Generator/generator_danych.ipynb** - generuje i odpowiednio modyfikuje dane do tabel, oraz zapisuje je do plików .csv
+- **Generator/tworzenie_bazy.ipynb** - tworzy tabele w bazie danych, wypełnia je danymi z plików .csv i odpowiednio obchodzi się z NULL-ami
+- **Dokumenty/schemat_bazy_projekt.json** - schemat bazy danych
+- **Dokumenty/dokumentacja.Rmd** - plik generujący dokumentację
+- **Dokumenty/dokumentacja.html** - wygenerowana dokumentacja
+- **Dokumenty/analiza_danych.Rmd** - plik generujący analizę danych
+- **Dokumenty/analiza_danych.html** - wygenerowana analiza
+- **Dokumenty/.Rhistory** - automatycznie tworzony plik, zapisuje historię kodów w R
+- **Dane do generatora/wycieczki.xlsx** - obecnie oferowane wycieczki przez Wombat Grylls sp. z o.o.
+- **Dane do generatora/cennik.csv** - cennik wycieczek
+- **Dane do generatora/stanowiska.xlsx** - stanowiska pracowników firmy, wraz z wysokością wynagrodzenia
+- **Dane do generatora/imiona.csv, nazwiska_damskie.csv, nazwiska_męskie.csv** - dane z GUS-u służące do generowania klientów, pracowników oraz danych alarmowe
+- **Dane do tabel/oferty.csv** - szczegółowe informacje na temat organizowanych przez firmę eventów
+- **Dane do tabel/cennik.csv** - zawiera informacje o cenach za udział, koszt na osobę oraz koszt organizacji dla poszczególnych wycieczek
+- **Dane do tabel/kierunki.csv** - w jakich miejscach odbywają się eventy
+- **Dane do tabel/miasta.csv** - w jakich miastach
+- **Dane do tabel/rodzaje.csv** - jakie rodzaje oferujemy
+- **Dane do tabel/osoby.csv** - dane klientów, czyli: imię, nazwisko, numer telefonu, e-mail oraz dane alarmowe
+- **Dane do tabel/dane_alarmowe.csv** - imiona, nazwiska i numery telefonów do osób, z którymi firma ma się kontaktować w razie problemów
+- **Dane do tabel/stanowiska.csv** - taki sam jak wcześniej, zapisany w odpowiednim formacie
+- **Dane do tabel/pracownicy.csv** - informacje o zatrudnianych przez nas pracownikach
+- **Dane do tabel/pracownik_urlop.csv** - informacje o urlopach poszczególnych pracowników
+- **Dane do tabel/zorganizowana_wycieczka.csv** - opis wycieczki, czyli: jaka to była oferta, ile osób pojechało i kiedy się odbyła
+- **Dane do tabel/pracownicy_wycieczka.csv** - który pracownik pojechał na którą wycieczkę
+- **Dane do tabel/osoby_zorganizowana_wycieczka.csv** - kto pojechał na którą wycieczkę, kiedy za nią zapłacił i jak ją ocenia
+- **Reszta** - katalog zawierający pliki pomocnicze, wykorzystywane w trakcie tworzenia projektu 
+
+# Lista zależności funkcyjnych
+
+## stanowiska
+```{r stanowiska}
+kable(stanowiska, align = "c")
+```
+$\Sigma$ = {A $\rightarrow$ BC, B $\rightarrow$ AC}  
+
+* Klucze kandydujące: A, B
+* Klucze elementarne: A, B
+* Klucz główny: A
+* Atrybuty elementarne: A, B
+
+## pracownicy
+```{r pracownicy}
+kable(pracownicy, align = "c")
+```
+$\Sigma$ = {A $\rightarrow$ BCDEFGH, G $\rightarrow$ ABCDEFH, H $\rightarrow$ ABCDEFG}    
+
+Czemu nie BCDEH $\rightarrow$ AFG?  
+Uznajemy, że los jest przekrętny i może się trafić, że na chwilę obecną dwie osoby mają to samo imię, nazwisko, datę zatrudnienia, stanowisko oraz jednocześnie zatrudnione lub nie. Gdybyśmy jednak uznali, że któryś podzbiór BCDEH wyznacza pracownika, to tym samym wyznaczałby cały wiersz na jego temat i stanowiłby tym samym nadklucz, nie psując EKNF
+
+* Klucze kandydujące: A, G, H
+* Klucze elementarne: A, G, H
+* Klucz główny: A
+* Atrybuty elementarne: A, G, H
+
+## urlopy
+```{r urlopy}
+kable(urlopy, align = "c")
+```
+$\Sigma$ = {AB $\rightarrow$ C, AC $\rightarrow$ B}  
+
+Czemu nie BC $\rightarrow$ A?
+Dwóch pracowników może mieć urlopy w tym samym terminie.
+
+* Klucze kandydujące: AB, AC
+* Klucze elementarne: AB, AC
+* Klucz główny: A
+* Atrybuty elementarne: A, B, C
+
+## osoby
+```{r osoby}
+kable(osoby, align = "c")
+```
+$\Sigma$ = {A $\rightarrow$ BCDEF, D $\rightarrow$ ABCEF, E $\rightarrow$ ABCDF}  
+
+Czemu nie BCF $\rightarrow$ ADEG?  
+Możemy mieć osoby o tym samym imieniu i nazwisku, które wyznaczają tę samą osobę jako kontaktową w razie problemów, np. mama, kolega czy siostra.
+
+* Klucze kandydujące: A, D, E
+* Klucze elementarne: A, D, E
+* Klucz główny: A
+* Atrybuty elementarne: A, D, E
+
+## dane_alarmowe
+```{r dane_alarmowe}
+kable(dane_alarmowe, align = "c")
+```
+$\Sigma$ = {A $\rightarrow$ BCD, D $\rightarrow$ ABC}  
+
+* Klucze kandydujące: A, D  
+* Klucze elementarne: A, D  
+* Klucz główny: A
+* Atrybuty elementarne: A, D
+
+## oferty
+```{r oferty}
+kable(oferty, align = "c")
+```
+$\Sigma$ = {A $\rightarrow$ BCDEFGHI, G $\rightarrow$ ABCDEFHI}  
+
+1. Nazwa nie jest unikalna - możemy mieć dwie wycieczki o tej samej nazwie, ale np. w innych miejscach
+2. Opis też może się powtarzać
+3. id_cennika za to jest unikatowe, aby:
+    1. Dało się w razie potrzeby łatwo zmienić ceny
+    2. Zachować informację o dawnych cenach przy ustalaniu nowych
+
+* Klucze kandydujące: A, G
+* Klucze elementarne: A, G  
+* Klucz główny: A
+* Atrybuty elementarne: A, G
+
+## kierunki
+```{r kierunki}
+kable(kierunki, align = "c")
+```
+$\Sigma$ = {A $\rightarrow$ B, B $\rightarrow$ A}  
+
+* Klucze kandydujące: A, B  
+* Klucze elementarne: A, B  
+* Klucz główny: A
+* Atrybuty elementarne: A, B
+
+## miasta
+```{r miasta}
+kable(miasta, align = "c")
+```
+$\Sigma$ = {A $\rightarrow$ B, B $\rightarrow$ A}  
+
+* Klucze kandydujące: A, B  
+* Klucze elementarne: A, B  
+* Klucz główny: A
+* Atrybuty elementarne: A, B
+
+## rodzaje
+```{r rodzaje}
+kable(rodzaje, align = "c")
+```
+$\Sigma$ = {A $\rightarrow$ B, B $\rightarrow$ A}  
+
+* Klucze kandydujące: A, B  
+* Klucze elementarne: A, B  
+* Klucz główny: A
+* Atrybuty elementarne: A, B
+
+## cennik
+```{r cennik}
+kable(cennik, align = "c")
+```
+$\Sigma$ = {A $\rightarrow$ BCD}
+
+
+Nie mamy żadnej innej relacji, gdyż wszelkie ceny i koszty są indywidualne dla wszystkich ofert (aby łatwiej można było w przyszłości np. zmienić ceny lub zachować informacje o starych) i może się zdarzyć, że np. dwa wydarzenia mają tą samą cenę i koszt na osobę, ale różne koszta organizacji (np. wynajęcie ratownika medycznego).
+
+* Klucz kandydujący: A 
+* Klucz elementarny: A
+* Klucz główny: A
+* Atrybut elementarny: A
+
+## zorganizowana_wycieczka
+```{r zorganizowana_wycieczka}
+kable(zorganizowana_wycieczka, align = "c")
+```
+$\Sigma$ = {A $\rightarrow$ BC, BC $\rightarrow$ A}  
+
+Czemu nie C $\rightarrow$ AB, ale za to BC $\rightarrow$ A?  
+Tego samego dnia moga rozpocząć się dwie różne wycieczki, ale o dwóch różnych ofertach.  
+
+* Klucz kandydujący: A 
+* Klucz elementarny: A  
+* Klucz główny: A
+* Atrybut elementarny: A
+
+## osoby_zorganizowana_wycieczka
+```{r osoby_zorganizowana_wycieczka}
+kable(osoby_zorganizowana_wycieczka, align = "c")
+```
+$\Sigma$ = {AB $\rightarrow$ CD}  
+
+Czemu nie BC $\rightarrow$ AD?  
+Bo jedna osoba może tego samego dnia zapłacić za dwie różne wycieczki oraz różnie je ocenić.  
+Czemu nie BCD $\rightarrow$ A?  
+Oczywiście może się zdarzyć, że jedna osoba tak samo oceni i tego samego dnia zapłaci za dwie różne wycieczki.
+
+* Klucze kandydujące: AB  
+* Klucze elementarne: AB  
+* Klucz główny: AB
+* Atrybuty elementarne: A, B
+
+## pracownicy_wycieczka
+```{r pracownicy_wycieczka}
+kable(pracownicy_wycieczka, align = "c")
+```
+$\Sigma$ = $\emptyset$  
+
+Pracownik jedzie na wiele wycieczek; Na jedną wycieczkę jedzie dwóch pracowników.
+
+## Czy baza jest w EKNF?
+
+Tak, ponieważ każda relacja nietrywialna zaczyna się od nadklucza (w tym niektóre kończą się również na atrybutach elementarnych).
+
+# Co było najtrudniejsze w projekcie
+
+1. Zebranie się do pracy po feriach świątecznych.
+2. Wymyślenie sposobu, jak sensownie generować dane.
+3. Uwzględnienie wszystkich zależności w danych (np. dat).
+4. Zrozumienie różnicy między kluczem głównym a elementarnym (aby poprawnie wykonać normalizację na poziomie EKNF).
+5. Stworzenie lokalnej i działającej bazy danych (zakończone porażką, musieliśmy prosić doktora Giniewicza o miejsce na serwerze 😔).
