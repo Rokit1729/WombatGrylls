@@ -1,5 +1,5 @@
 Kroki:
 1. Generator/generator_danych.ipynb
 2. Generator/tworzenie_bazy.ipynb
-3. Analiza/analiza_danych.Rmd
-4. Dokumentacja/dokumentacja.Rmd
+3. Dokumenty/analiza_danych.Rmd
+4. Dokumenty/dokumentacja.Rmd
