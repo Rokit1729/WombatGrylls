@@ -388,4 +388,3 @@ W razie pytań dotyczących projektu, prosimy o kontakt mailowy z którymkolwiek
 ---
 
 © 2025 Wikor Niedźwiedzki, Filip Michewicz, Jakub Wiszniewski, Dawid Skowroński, Mateusz Broczkowski – „Wombat Grylls”  
-```
