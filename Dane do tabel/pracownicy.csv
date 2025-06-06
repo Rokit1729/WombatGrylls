@@ -1,0 +1,16 @@
+id_pracownika,imie,nazwisko,id_stanowiska,data_zatrudnienia,czy_zatrudniony,numer_telefonu,email
+1,HANNA,BARTOSIK,1,2023-06-11,1,798288586,hanna.bartosik1@wombat.pl
+2,AGATA,STRUZIK,5,2023-06-19,1,430278389,agata.struzik2@wombat.pl
+3,ZOFIA,MACKIEWICZ,8,2023-06-23,1,704227548,zofia.mackiewicz3@wombat.pl
+4,ALICJA,TOMCZYK-OLCZAK,2,2023-06-10,1,593074380,alicja.tomczyk-olczak4@wombat.pl
+5,GAJA,PARUSEL,2,2023-06-11,1,574359888,gaja.parusel5@wombat.pl
+6,OLIWIA,STASZEWSKA,6,2023-06-06,1,816214273,oliwia.staszewska6@wombat.pl
+7,NINA,RUSIECKA,1,2023-06-03,1,688984319,nina.rusiecka7@wombat.pl
+8,ZOFIA,PĘDZISZ,7,2023-06-23,1,877131231,zofia.pędzisz8@wombat.pl
+9,MARCELINA,PRASKA,2,2023-06-14,1,428135871,marcelina.praska9@wombat.pl
+10,NIKODEM,TURLIŃSKI,4,2023-06-21,1,803628394,nikodem.turliński10@wombat.pl
+11,LUKRECJA,MĘKA,1,2023-06-09,1,933870138,lukrecja.męka11@wombat.pl
+12,JAN,FIGAS,1,2023-06-08,1,876178602,jan.figas12@wombat.pl
+13,HANNA,ZAMOJSKA,3,2023-06-23,1,457259549,hanna.zamojska13@wombat.pl
+14,EMILIA,SZCZERKOWSKA,2,2023-06-18,1,437898729,emilia.szczerkowska14@wombat.pl
+15,OLIWIA,MAJEK,3,2023-06-21,1,408685627,oliwia.majek15@wombat.pl

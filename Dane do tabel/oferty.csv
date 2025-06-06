@@ -1,0 +1,36 @@
+id_oferty,nazwa,id_rodzaju,id_kierunku,id_miasta,opis,id_cennika,czas_trwania,czy_bezpieczna
+1,Survival z węgierskim poradnikiem przetrwania,7,13,3,"Uczestnicy muszą przejść test przetrwania w lesie, korzystając z poradnika w języku węgierskim bez tłumaczenia. Słowniki są zakazane.",1,3,0
+2,"Babciowy escape room, czyli ucieczka przed kolejną dokładką",2,15,19,"Gra w pokoju stylizowanym na tradycyjną kuchnię, gdzie jedynym wyjściem jest uniknięcie dokładki pierogów i schabowego.",2,1,0
+3,Poszukiwanie Świętego Górala,8,4,1,"Czarna komedia oparta na poszukiwaniach legendarnego artefaktu, nawiązująca do średniowiecznych pieśni o czynach.",3,2,1
+4,Niespodziewana rekonstrukcja hiszpańskiej inkwizycji,8,2,2,Chyba nikt nie spodziewał się tej wycieczki.,4,2,0
+5,Skok za spadochronem,9,12,12,Na co komu spadochron? Wyskocz razem z instruktorem i spróbuj złapać swój plecak.,5,1,0
+6,Konkurs na najlepszy tuning Polonez,14,22,16,Konkurs na najbardziej absurdalny tuning Poloneza w klimacie Polski lat 90.,6,1,1
+7,Wyścigi 'Maluchów' z silnikami V8,14,22,17,"Fiaty 126p z przerażającymi silnikami – szybkość, chaos, dym spod kół i zerwany pas transmisyjny!",7,1,0
+8,Misja szpiegowska: infiltracja opuszczonej kamienicy w stroju Lajkonika,3,5,14,"Agent musi przejść przez pełną niebezpieczeństw opuszczoną kamienicę, przebrany za Lajkonika, by zdobyć tajne informacje w najbardziej zaskakujący sposób.",8,1,1
+9,Misja szpiegowska: Tajna misja w pełnej zbroi płytowej,3,8,19,Czy uda ci się przejść przez labirynt pełen przeszkód i odzyskać tajne informacje będąc przyodziany w pełną zbroje.,9,1,1
+10,Konkurs kulinarny: Najdziwniejszy kebab,10,5,21,"Uczestnicy tworzą najbardziej zaskakujące i oryginalne kebaby, łącząc nietypowe składniki w jedną, smaczną całość.",10,3,0
+11,Konkurs kulinarny: 101 dań z cebuli,10,5,11,"Konkurs, w którym zawodnicy muszą wymyślić 101 różnych dań, wykorzystujących cebulę w najbardziej kreatywny sposób.",11,1,1
+12,Konkurs kulinarny: Niedorzeczne połączenia,10,3,19,"Kucharze łączą zupełnie niepasujące składniki, by stworzyć dania, które zaskoczą zarówno wyglądem, jak i smakiem.",12,1,0
+13,Zwiedzanie ogrodu botanicznego w masce przeciwgazowej,11,7,18,"Zwiedzanie ogrodu botanicznego w masce przeciwgazowej sprawia, że każda roślina nabiera nowego, tajemniczego charakteru.",13,1,1
+14,Skok na grzybobranie (dosłownie),9,12,9,"Po ekstremalnym skoku z wysokości uczestnicy od razu udają się na grzybobranie, łącząc adrenalinę z naturą.",14,1,0
+15,Nocne grzybobranie w noktowizorach,15,1,1,Wyrusz na nocne grzybobranie w towarzystwie noktowizorów! Odkryj tajemnice lasu w zupełnie nowym świetle. ,15,2,1
+16,Grzybobranie na poligonie wojskowym,15,14,12,Zbieranie grzybów między czołgami i atrapami min. Zwycięzcy uczestniczą w przejażdżce czołgiem.,16,1,0
+17,Grzybobranie podczas inscenizacji polowania,15,1,6,Grzybobranie w lesie pełnym dźwięku zwierząt oraz wystrzałów z strzelb myśliwych.,17,1,0
+18,Golf na szczudłach,4,21,21,"Gra w golfa na szczudłach, gdzie precyzja i równowaga są kluczowe, aby trafić w dołek na nietypowym torze.",18,1,1
+19,Karaoke na helu,6,19,9,Wciągnij pełną pierś helu i daj się ponieść muzyce!,19,1,1
+20,Wyścig w wózkach sklepowych,5,22,6,"Przygotuj się na szaloną jazdę! Pamiętaj tylko, by nie wjechać w stoisko z jajkami!",20,1,1
+21,Metalowy koncert na lirze korbowej i burczybasie,6,19,10,Ciężkie brzmienie metalu w zupełnie nowym wydaniu! Koncert na lirze korbowej i burczybasie to nie lada gratka dla miłośników ekstremalnych dźwięków.,21,1,1
+22,Wycieczka rowerowa z Ojcem Matateusz,12,3,16,"Rowerowa wyprawa z Ojcem Matateuszem, pełna tajemniczych przygód i filozoficznych rozmów.",22,1,1
+23,Pomysł na najbardziej niedorzeczne ministerstwo,16,5,5,"Czas na rewolucję w polskim rządzie! Jak myślisz, jakie ministerstwo byłoby najbardziej niedorzeczne?",23,1,1
+24,Kurs normalizacji baz danych w języku chińskim,8,11,10,Zawiera naukę języka chińskiego i teorię normalizacji ba danych,24,7,0
+25,"Noc RPGów, ale to liczby zespolone",13,17,13,"Grupa entuzjastów RPG wkracza w świat matematyki, gdzie każda decyzja i walka odbywają się za pomocą liczb zespolonych.",25,2,1
+26,Grzybobranie na szczudłach,15,1,17,"Zbieranie grzybów na szczudłach – wyzwanie, które łączy równowagę, zręczność i miłość do natury.",26,1,1
+27,Konkurs na najbardziej zbędny gadżet,16,21,20,"Uczestnicy muszą stworzyć najbardziej absurdalny gadżet, który zdaje się zupełnie niepotrzebny.",27,1,1
+28,Konkurs jedzenia kiszonego śledzia,10,21,8,Kto poradzi sobie z jedzeniem kiszonego śledzia w jak najkrótszym czasie?,28,1,0
+29,Najlepsze przebranie za znak drogowy,1,5,21,"Uczestnicy rywalizują w stworzeniu najbardziej kreatywnego i zabawnego przebrania za znak drogowy, łącząc styl i humor.",29,1,1
+30,Półmaraton w strojach T-Rexa,4,23,1,"Wyobraź sobie tłum dinozaurów biegnących ulicami miasta, zdeterminowanych, by pokonać swoje ograniczenia.",30,1,1
+31,Noc gier planszowych ze zmianą miejsc,13,17,14,"Ekscytująca noc gier planszowych, gdzie gracze co godzinę zamieniają się miejscami i próbują swoich sił w innych grach.",31,2,1
+32,Szachy warcabami,13,5,4,"Gra, w której może wydarzyć się wszystko. ",32,1,1
+33,Gra Łasicy,9,16,21,"Klasy, kapsle, ciuciubabka, chowany. Polskie gry podwórkowe podkręcone do granic możliwości. Wygra ten kto ukończy wszystkie wyzwania i wykaże się sprytem.",33,1,0
+34,Walka na szable w okularach zniekształcających rzeczywistość,8,9,7,"Przygotuj się na walkę w zakrzywionej rzeczywistości! Włóż okulary, które zniekształcają obraz, i stań twarzą w twarz z przeciwnikiem uzbrojonym w szablę.",34,1,0
+35,Ucieczka z więzienia w stroju klauna,2,11,17,"Uczestnicy wcielają się w rolę więźniów, którzy muszą zaplanować i przeprowadzić spektakularną ucieczkę z więzienia z pomocą improwizowanych narzędzi.",35,1,0
