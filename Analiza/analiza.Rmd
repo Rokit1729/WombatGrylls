@@ -1,0 +1,1298 @@
+---
+title: "Analiza danych grupy C"
+author: Mateusz Broczkowski, Filip Michewicz, Dawid Skowroński, Wiktor Niedźwiedzki, Jakub Wiszniewski
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    number_section: true
+    toc: true
+    toc_depth: 3
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE)
+```
+
+```{r biblioteki+połączenie}
+options(scipen = 999)
+library(scales)
+library(ggplot2)
+library(RMariaDB)
+library(dplyr)
+library(zoo)
+library(knitr)
+library(stringr)
+
+con <- dbConnect(RMariaDB::MariaDB(),
+                 dbname = "team24",
+                 username = "team24",
+                 password = "te@mzaza",
+                 host = "giniewicz.it")
+```
+```{r zapytania}
+############################### TABELKA ID_OFERT - NAZWA #####################################
+
+query <- "SELECT id_oferty, nazwa
+          FROM oferty"
+
+tabelka <- dbGetQuery(con, query)
+
+############################### ZADANIE 1 #####################################
+query <- "SELECT id_oferty,COUNT(id_oferty) AS liczba_wycieczek
+          FROM team24.zorganizowana_wycieczka LEFT OUTER JOIN team24.oferty USING(id_oferty)
+          GROUP BY id_oferty
+          ORDER BY COUNT(id_oferty) DESC;"
+
+wycieczki <- dbGetQuery(con, query)
+
+query <- "SELECT t1.id_oferty,t2.nazwa,t2.id_cennika,
+        COUNT(t3.id_osoby) AS `liczba_uczestników`
+        FROM zorganizowana_wycieczka AS t1
+        JOIN oferty AS t2 USING(id_oferty)
+        JOIN osoby_zorganizowana_wycieczka AS t3 USING(id_wycieczki)
+        GROUP BY t1.id_oferty
+        ORDER BY COUNT(t3.id_osoby) DESC;"
+
+uczestnicy <- dbGetQuery(con, query)
+
+
+query <- "SELECT * FROM team24.cennik;"
+cennik <- dbGetQuery(con, query)
+
+############################### ZADANIE 2 #####################################
+query_2.1 <- "SELECT YEAR(data_wycieczki) AS rok, 
+              MONTH(data_wycieczki) AS miesiac, 
+              COUNT(id_osoby) AS liczba_klientow
+              FROM osoby_zorganizowana_wycieczka
+              JOIN zorganizowana_wycieczka USING(id_wycieczki)
+              GROUP BY rok, miesiac
+              ORDER BY rok ASC, miesiac ASC;"
+
+df_klienci_wszyscy <- dbGetQuery(con, query_2.1)
+
+query_2.1_zysk <- "SELECT  rok,
+                          miesiac, 
+                          SUM(zysk) AS zysk_miesieczny 
+                  FROM (SELECT
+                      YEAR(z.data_wycieczki) AS rok,
+                      MONTH(z.data_wycieczki) AS miesiac,
+                      SUM(c.cena_biletu) - SUM(c.koszt_na_osobe) - SUM(DISTINCT c.koszt_podstawowy) AS zysk 
+                  FROM osoby_zorganizowana_wycieczka AS ozw
+                  JOIN zorganizowana_wycieczka AS z USING(id_wycieczki)
+                  JOIN oferty AS o USING(id_oferty)
+                  JOIN cennik AS c USING(id_cennika)
+                  WHERE data_platnosci IS NOT NULL
+                  GROUP BY id_wycieczki) AS wycieczki_na_miesiac
+                  GROUP BY rok, miesiac
+                  ORDER BY rok ASC, miesiac ASC;
+                  "
+
+df_zysk_wszystko <- dbGetQuery(con, query_2.1_zysk)
+
+query_2.2 <- "SELECT YEAR(data_wycieczki) AS rok, 
+              MONTH(data_wycieczki) AS miesiac, 
+              COUNT(DISTINCT(id_osoby)) AS liczba_klientow
+              FROM osoby_zorganizowana_wycieczka
+              JOIN zorganizowana_wycieczka USING(id_wycieczki)
+              GROUP BY rok, miesiac
+              ORDER BY rok ASC, miesiac ASC;"
+
+df_klienci_unikatowi <- dbGetQuery(con, query_2.2)
+
+query_2.3 <- "SELECT COUNT(id_pracownika) AS liczba_pracowników,
+              SUM(wynagrodzenie) AS miesieczne_oplaty_wynagrodzen
+              FROM stanowiska
+              JOIN pracownicy USING(id_stanowiska);"
+
+df_oplaty_pracownikow <- dbGetQuery(con, query_2.3)
+
+############################### ZADANIE 3 #####################################
+
+query3.1 <- "SELECT id_oferty, nazwa, (1 - nie_wrocili / byli) AS return_rate
+FROM (
+    SELECT id_oferty, COUNT(id_oferty) AS nie_wrocili
+    FROM (
+        SELECT MAX(id_wycieczki) AS ostatnia_wycieczka
+        FROM osoby_zorganizowana_wycieczka
+        WHERE id_wycieczki IN (
+            SELECT id_wycieczki
+            FROM zorganizowana_wycieczka
+            WHERE data_wycieczki <= CURRENT_DATE
+        )
+        GROUP BY id_osoby
+    ) AS ostatnia_wycieczka_query
+    LEFT JOIN zorganizowana_wycieczka
+        ON ostatnia_wycieczka_query.ostatnia_wycieczka = id_wycieczki
+    GROUP BY id_oferty) AS pierwsza
+JOIN (
+    SELECT id_oferty, COUNT(id_oferty) AS byli
+    FROM osoby_zorganizowana_wycieczka
+    LEFT JOIN zorganizowana_wycieczka USING(id_wycieczki)
+    GROUP BY id_oferty
+) AS druga USING(id_oferty)
+JOIN oferty USING(id_oferty)
+ORDER BY id_oferty"
+df3.1 <- dbGetQuery(con, query3.1)
+
+query3.2 <- "SELECT wycieczki_per_osoba, COUNT(*) AS liczba_osob
+FROM (
+  SELECT COUNT(id_wycieczki) AS wycieczki_per_osoba
+  FROM osoby_zorganizowana_wycieczka
+  GROUP BY id_osoby
+) AS liczba_wycieczek_per_osoba
+GROUP BY wycieczki_per_osoba;"
+df3.2 <- dbGetQuery(con, query3.2)
+
+############################### ZADANIE 4 #####################################
+query <- "SELECT t1.id_wycieczki,
+t3.nazwa,
+FLOOR(AVG(t1.ocena)*100)/100 AS `srednia_ocena_wycieczki`
+FROM osoby_zorganizowana_wycieczka AS t1
+JOIN zorganizowana_wycieczka AS t2 USING(id_wycieczki)
+JOIN oferty AS t3 USING(id_oferty)
+WHERE ocena IS NOT NULL
+GROUP BY id_wycieczki
+HAVING
+FLOOR(AVG(t1.ocena)*100)/100 = (SELECT DISTINCT FLOOR(AVG(ocena)*100)/100 AS `x`
+                                FROM osoby_zorganizowana_wycieczka
+                                WHERE ocena IS NOT NULL
+                                GROUP BY id_wycieczki
+                                ORDER BY `x` DESC
+                                LIMIT 1)
+OR
+FLOOR(AVG(t1.ocena)*100)/100 = (SELECT DISTINCT FLOOR(AVG(ocena)*100)/100 AS `x`
+                                FROM osoby_zorganizowana_wycieczka
+                                WHERE ocena IS NOT NULL
+                                GROUP BY id_wycieczki
+                                ORDER BY `x` DESC
+                                LIMIT 1, 1)
+OR
+FLOOR(AVG(t1.ocena)*100)/100 = (SELECT DISTINCT FLOOR(AVG(ocena)*100)/100 AS `x`
+                                FROM osoby_zorganizowana_wycieczka
+                                WHERE ocena IS NOT NULL
+                                GROUP BY id_wycieczki
+                                ORDER BY `x` DESC
+                                LIMIT 2, 1)
+ORDER BY `srednia_ocena_wycieczki` DESC, id_wycieczki;"
+najlepsze_wyc <- dbGetQuery(con, query)
+
+query <- "SELECT t1.id_wycieczki,
+t3.nazwa,
+FLOOR(AVG(t1.ocena)*100)/100 AS `srednia_ocena_wycieczki`
+FROM osoby_zorganizowana_wycieczka AS t1
+JOIN zorganizowana_wycieczka AS t2 USING(id_wycieczki)
+JOIN oferty AS t3 USING(id_oferty)
+WHERE ocena IS NOT NULL
+GROUP BY id_wycieczki
+HAVING
+FLOOR(AVG(t1.ocena)*100)/100 = (SELECT DISTINCT FLOOR(AVG(ocena)*100)/100 AS `x`
+                                FROM osoby_zorganizowana_wycieczka
+                                WHERE ocena IS NOT NULL
+                                GROUP BY id_wycieczki
+                                ORDER BY `x` ASC
+                                LIMIT 1)
+OR
+FLOOR(AVG(t1.ocena)*100)/100 = (SELECT DISTINCT FLOOR(AVG(ocena)*100)/100 AS `x`
+                                FROM osoby_zorganizowana_wycieczka
+                                WHERE ocena IS NOT NULL
+                                GROUP BY id_wycieczki
+                                ORDER BY `x` ASC
+                                LIMIT 1, 1)
+OR
+FLOOR(AVG(t1.ocena)*100)/100 = (SELECT DISTINCT FLOOR(AVG(ocena)*100)/100 AS `x`
+                                FROM osoby_zorganizowana_wycieczka
+                                WHERE ocena IS NOT NULL
+                                GROUP BY id_wycieczki
+                                ORDER BY `x` ASC
+                                LIMIT 2, 1)
+ORDER BY `srednia_ocena_wycieczki` ASC, id_wycieczki;"
+najgorsze_wyc <- dbGetQuery(con, query)
+
+query <- "SELECT t2.id_oferty,
+          FLOOR(AVG(t1.ocena)*100)/100 AS `srednia_ocena_ofert`
+          FROM osoby_zorganizowana_wycieczka AS t1
+          JOIN zorganizowana_wycieczka AS t2 USING (id_wycieczki)
+          WHERE t1.ocena IS NOT NULL
+          GROUP BY t2.id_oferty;"
+oferty <- dbGetQuery(con, query)
+
+############################### ZADANIE 5 #####################################
+
+query5 <- "SELECT ozw.id_wycieczki, o.imie, o.nazwisko, o.email, o2.imie, o2.nazwisko
+FROM osoby_zorganizowana_wycieczka ozw
+JOIN zorganizowana_wycieczka z ON ozw.id_wycieczki = z.id_wycieczki
+JOIN oferty of ON z.id_oferty = of.id_oferty
+JOIN osoby o ON ozw.id_osoby = o.id_osoby
+JOIN dane_alarmowe da ON o.id_alarm = da.id_alarm
+JOIN osoby o2 ON da.numer_telefonu = o2.numer_telefonu
+                AND o2.imie = da.imie 
+                AND o2.nazwisko = da.nazwisko
+JOIN osoby_zorganizowana_wycieczka ozw2 ON o2.id_osoby = ozw2.id_osoby
+JOIN (
+   SELECT id_osoby, MAX(id_wycieczki) AS ostatnia_wycieczka
+        FROM osoby_zorganizowana_wycieczka
+        WHERE id_wycieczki IN (
+            SELECT id_wycieczki
+            FROM zorganizowana_wycieczka
+        )
+        GROUP BY id_osoby 
+) ow ON ow.id_osoby = o.id_osoby
+WHERE czy_bezpieczna = 0
+  AND ozw.id_wycieczki = ozw2.id_wycieczki
+  AND ozw.id_wycieczki = ow.ostatnia_wycieczka;
+"
+df5 <- dbGetQuery(con, query5)
+
+############################### ZADANIE 6 #####################################
+
+query6.1 <- "SELECT 
+    imie, 
+    nazwisko,
+    YEAR(z.data_wycieczki) AS rok,
+    MONTH(z.data_wycieczki) AS miesiac,
+    SUM(c.cena_biletu) - SUM(c.koszt_na_osobe) - SUM(DISTINCT c.koszt_podstawowy) AS zysk
+FROM osoby_zorganizowana_wycieczka AS ozw
+JOIN zorganizowana_wycieczka AS z USING(id_wycieczki)
+JOIN oferty AS o USING(id_oferty)
+JOIN cennik AS c USING(id_cennika)
+LEFT JOIN pracownicy_wycieczka AS p ON p.id_wycieczki = ozw.id_wycieczki
+JOIN pracownicy USING(id_pracownika)
+WHERE data_platnosci IS NOT NULL
+AND p.id_pracownika IN (
+        SELECT id_pracownika
+        FROM pracownicy
+        WHERE id_stanowiska = 1
+    )
+AND z.data_wycieczki <= CURDATE()
+GROUP BY id_pracownika, YEAR(z.data_wycieczki), MONTH(z.data_wycieczki)
+ORDER BY id_pracownika, rok, miesiac;
+"
+
+df6.1 <- dbGetQuery(con, query6.1)
+
+query6.2 <- "SELECT 
+    imie, 
+    nazwisko,
+    YEAR(z.data_wycieczki) AS rok,
+    MONTH(z.data_wycieczki) AS miesiac,
+    SUM(c.cena_biletu) - SUM(c.koszt_na_osobe) - SUM(DISTINCT c.koszt_podstawowy) AS zysk
+FROM osoby_zorganizowana_wycieczka AS ozw
+JOIN zorganizowana_wycieczka AS z USING(id_wycieczki)
+JOIN oferty AS o USING(id_oferty)
+JOIN cennik AS c USING(id_cennika)
+LEFT JOIN pracownicy_wycieczka AS p ON p.id_wycieczki = ozw.id_wycieczki
+JOIN pracownicy USING(id_pracownika)
+WHERE data_platnosci IS NOT NULL
+AND p.id_pracownika IN (
+        SELECT id_pracownika
+        FROM pracownicy
+        WHERE id_stanowiska = 2
+    )
+AND z.data_wycieczki <= CURDATE()
+GROUP BY id_pracownika, YEAR(z.data_wycieczki), MONTH(z.data_wycieczki)
+ORDER BY id_pracownika, rok, miesiac;
+"
+
+df6.2 <- dbGetQuery(con, query6.2)
+
+############################### ZADANIE 7 #####################################
+
+query7.1 <- "SELECT
+      id_osoby AS osoba, wycieczka, id_oferty AS oferta
+  FROM (SELECT 
+          id_osoby, 
+          MIN(osoby_zorganizowana_wycieczka.id_wycieczki) AS wycieczka
+      FROM osoby_zorganizowana_wycieczka 
+      GROUP BY id_osoby
+      ORDER BY id_osoby) AS t
+  JOIN zorganizowana_wycieczka ON t.wycieczka = zorganizowana_wycieczka.id_wycieczki
+  ORDER BY id_osoby;"
+
+df7.1 <- dbGetQuery(con, query7.1)
+df7.1.oferty.n <- df7.1 %>%
+  group_by(oferta) %>%
+  summarise(liczba_wystapien = n()) %>%
+  arrange(desc(liczba_wystapien))
+
+df7.1$oferta <- as.factor(df7.1$oferta)
+
+najpopularniejsza.pierwsza <- df7.1.oferty.n$oferta[[1]]
+
+najpopularniejsza.pierwsza.nazwa <- dbGetQuery(con, paste0("SELECT nazwa FROM oferty WHERE id_oferty = ", najpopularniejsza.pierwsza))
+  
+query7.2 <- "SELECT * FROM ((SELECT 
+      id_osoby AS osoba, 
+      osoby_zorganizowana_wycieczka.id_wycieczki AS wycieczka, 
+      id_oferty AS oferta
+  FROM osoby_zorganizowana_wycieczka
+  JOIN zorganizowana_wycieczka ON osoby_zorganizowana_wycieczka.id_wycieczki = zorganizowana_wycieczka.id_wycieczki
+  ORDER BY id_osoby)
+  EXCEPT
+  (SELECT
+      id_osoby AS osoba, wycieczka, id_oferty AS oferta
+  FROM (SELECT 
+          id_osoby, 
+          MIN(osoby_zorganizowana_wycieczka.id_wycieczki) AS wycieczka
+      FROM osoby_zorganizowana_wycieczka 
+      GROUP BY id_osoby
+      ORDER BY id_osoby) AS t
+  JOIN zorganizowana_wycieczka ON t.wycieczka = zorganizowana_wycieczka.id_wycieczki
+  ORDER BY id_osoby
+  )) AS bez_pierwszych
+  ORDER BY osoba;"
+
+# Po pierwszej wycieczce, jaka jest najpopularniejsza wycieczka, którą wybierają jako następną?
+
+df7.2 <- dbGetQuery(con, query7.2)
+df7.2.oferty.n <- df7.2 %>%
+  group_by(oferta) %>%
+  summarise(liczba_wystapien = n()) %>%
+  arrange(desc(liczba_wystapien))
+
+df7.2$oferta <- as.factor(df7.2$oferta)
+
+najpopularniejsza.potem <- df7.2.oferty.n$oferta[[1]]
+
+najpopularniejsza.potem.nazwa <- dbGetQuery(con, paste0("SELECT nazwa FROM oferty WHERE id_oferty = ", najpopularniejsza.potem))
+
+query7.3 <- "SELECT COUNT(DISTINCT id_osoby) AS liczba_osob FROM osoby_zorganizowana_wycieczka;"
+df7.3 <- dbGetQuery(con, query7.3)
+df7.3 <- df7.3$liczba_osob
+
+############################### ZADANIE 8 #####################################
+
+query8.1 <- "SELECT 
+    le.id_osoby,
+    o.imie,
+    o.nazwisko,
+    DATEDIFF(CURRENT_DATE, zo.data_wycieczki) AS dni_od_ostatniej_wycieczki, 
+    zo.data_wycieczki
+FROM (
+    SELECT 
+        id_osoby, 
+        MAX(id_wycieczki) AS ostatnia_wycieczka
+    FROM osoby_zorganizowana_wycieczka
+    WHERE id_wycieczki IN (
+        SELECT id_wycieczki
+        FROM zorganizowana_wycieczka
+    )
+    GROUP BY id_osoby   
+) AS le
+JOIN zorganizowana_wycieczka zo ON zo.id_wycieczki = le.ostatnia_wycieczka
+JOIN osoby o ON o.id_osoby = le.id_osoby;"
+df8.1 <- dbGetQuery(con, query8.1)
+
+query8.2 <- "SELECT 
+    DATEDIFF(CURRENT_DATE, zo.data_wycieczki) AS dni_od_ostatniej_wycieczki, 
+    COUNT(DATEDIFF(CURRENT_DATE, zo.data_wycieczki)) AS licznosc
+FROM (
+    SELECT id_osoby, MAX(id_wycieczki) AS ostatnia_wycieczka
+    FROM osoby_zorganizowana_wycieczka
+    WHERE id_wycieczki IN (
+        SELECT id_wycieczki
+        FROM zorganizowana_wycieczka
+    )
+    GROUP BY id_osoby   
+) AS le
+JOIN zorganizowana_wycieczka zo ON zo.id_wycieczki = le.ostatnia_wycieczka
+GROUP BY dni_od_ostatniej_wycieczki
+ORDER BY dni_od_ostatniej_wycieczki DESC;"
+df8.2 <- dbGetQuery(con, query8.2)
+
+query8.3 <- "SELECT id_stanowiska, COUNT(id_pracownika) AS liczba_pracownikow
+FROM pracownicy
+WHERE id_stanowiska IN (1, 2)
+GROUP BY id_stanowiska;"
+
+df8.3 <- dbGetQuery(con, query8.3)
+
+############################### ZADANIE 9 #####################################
+
+query9.1 <- "WITH RECURSIVE dni_urlopu AS (
+    SELECT 
+        poczatek_urlopu AS dzien, 
+        id_pracownika
+    FROM urlopy
+    WHERE id_pracownika IN (
+        SELECT id_pracownika
+        FROM pracownicy
+        WHERE id_stanowiska = 1
+    )
+    UNION ALL
+    SELECT 
+        dzien + INTERVAL 1 DAY, 
+        id_pracownika
+    FROM dni_urlopu
+    WHERE dzien < (SELECT koniec_urlopu 
+                   FROM urlopy 
+                   WHERE id_pracownika = dni_urlopu.id_pracownika 
+                     AND poczatek_urlopu = (SELECT MIN(poczatek_urlopu)
+                                            FROM urlopy u
+                                            WHERE u.id_pracownika = dni_urlopu.id_pracownika))
+),
+dni_pracy AS (
+    SELECT 
+        id_pracownika, 
+        data_wycieczki AS dzien, 
+        czas_trwania
+    FROM pracownicy_wycieczka
+    JOIN zorganizowana_wycieczka USING (id_wycieczki)
+    JOIN oferty USING (id_oferty)
+    WHERE id_pracownika IN (
+        SELECT id_pracownika
+        FROM pracownicy
+        WHERE id_stanowiska = 1
+    )
+    UNION ALL
+    SELECT 
+        id_pracownika, 
+        dzien + INTERVAL 1 DAY, 
+        czas_trwania - 1
+    FROM dni_pracy
+    WHERE czas_trwania > 1
+),
+urlopy_agg AS (
+    SELECT 
+        dzien, 
+        COUNT(id_pracownika) AS liczba_pracownikow_na_urlopie
+    FROM dni_urlopu
+    GROUP BY dzien
+),
+wycieczki_agg AS (
+    SELECT 
+        dzien, 
+        COUNT(id_pracownika) AS liczba_pracownikow_na_wyjezdzie
+    FROM dni_pracy
+    GROUP BY dzien
+)
+SELECT 
+    dzien,
+    COALESCE(liczba_pracownikow_na_wyjezdzie, 0) AS liczba_pracownikow_na_wyjezdzie,
+    COALESCE(liczba_pracownikow_na_urlopie, 0) AS liczba_pracownikow_na_urlopie,
+    COALESCE(liczba_pracownikow_na_wyjezdzie, 0) + COALESCE(liczba_pracownikow_na_urlopie, 0) AS suma_pracownikow
+FROM (
+    SELECT 
+        u.dzien, 
+        u.liczba_pracownikow_na_urlopie, 
+        w.liczba_pracownikow_na_wyjezdzie
+    FROM urlopy_agg u
+    LEFT JOIN wycieczki_agg w ON u.dzien = w.dzien
+    UNION
+    SELECT 
+        w.dzien, 
+        u.liczba_pracownikow_na_urlopie, 
+        w.liczba_pracownikow_na_wyjezdzie
+    FROM wycieczki_agg w
+    LEFT JOIN urlopy_agg u ON u.dzien = w.dzien
+) AS combined
+WHERE dzien <= CURRENT_DATE
+ORDER BY dzien;
+"
+df9.1 <- dbGetQuery(con, query9.1)
+
+query9.2 <- "WITH RECURSIVE dni_urlopu AS (
+    SELECT 
+        poczatek_urlopu AS dzien, 
+        id_pracownika
+    FROM urlopy
+    WHERE id_pracownika IN (
+        SELECT id_pracownika
+        FROM pracownicy
+        WHERE id_stanowiska = 2
+    )
+    UNION ALL
+    SELECT 
+        dzien + INTERVAL 1 DAY, 
+        id_pracownika
+    FROM dni_urlopu
+    WHERE dzien < (SELECT koniec_urlopu 
+                   FROM urlopy 
+                   WHERE id_pracownika = dni_urlopu.id_pracownika 
+                     AND poczatek_urlopu = (SELECT MIN(poczatek_urlopu)
+                                            FROM urlopy u
+                                            WHERE u.id_pracownika = dni_urlopu.id_pracownika))
+),
+dni_pracy AS (
+    SELECT 
+        id_pracownika, 
+        data_wycieczki AS dzien, 
+        czas_trwania
+    FROM pracownicy_wycieczka
+    JOIN zorganizowana_wycieczka USING (id_wycieczki)
+    JOIN oferty USING (id_oferty)
+    WHERE id_pracownika IN (
+        SELECT id_pracownika
+        FROM pracownicy
+        WHERE id_stanowiska = 2
+    )
+    UNION ALL
+    SELECT 
+        id_pracownika, 
+        dzien + INTERVAL 1 DAY, 
+        czas_trwania - 1
+    FROM dni_pracy
+    WHERE czas_trwania > 1
+),
+urlopy_agg AS (
+    SELECT 
+        dzien, 
+        COUNT(id_pracownika) AS liczba_pracownikow_na_urlopie
+    FROM dni_urlopu
+    GROUP BY dzien
+),
+wycieczki_agg AS (
+    SELECT 
+        dzien, 
+        COUNT(id_pracownika) AS liczba_pracownikow_na_wyjezdzie
+    FROM dni_pracy
+    GROUP BY dzien
+)
+SELECT 
+    dzien,
+    COALESCE(liczba_pracownikow_na_wyjezdzie, 0) AS liczba_pracownikow_na_wyjezdzie,
+    COALESCE(liczba_pracownikow_na_urlopie, 0) AS liczba_pracownikow_na_urlopie,
+    COALESCE(liczba_pracownikow_na_wyjezdzie, 0) + COALESCE(liczba_pracownikow_na_urlopie, 0) AS suma_pracownikow
+FROM (
+    SELECT 
+        u.dzien, 
+        u.liczba_pracownikow_na_urlopie, 
+        w.liczba_pracownikow_na_wyjezdzie
+    FROM urlopy_agg u
+    LEFT JOIN wycieczki_agg w ON u.dzien = w.dzien
+    UNION
+    SELECT 
+        w.dzien, 
+        u.liczba_pracownikow_na_urlopie, 
+        w.liczba_pracownikow_na_wyjezdzie
+    FROM wycieczki_agg w
+    LEFT JOIN urlopy_agg u ON u.dzien = w.dzien
+) AS combined
+WHERE dzien <= CURRENT_DATE
+ORDER BY dzien;
+"
+df9.2 <- dbGetQuery(con, query9.2)
+
+#Zakończenie połączenia
+dbDisconnect(con)
+```
+
+``` {r tabelka}
+
+kable(tabelka,, 
+      col.names = c("Oferta", "Nazwa wycieczki"), 
+      caption = "Tabela z ofertami")
+
+```
+
+
+# Znajdź najpopularniejsze rodzaje wycieczek, porównaj koszta i zyski, czy są opłacalne?
+
+```{r tabela,echo=FALSE,warning=FALSE }
+merged1 <- merge(uczestnicy, wycieczki, by = "id_oferty")
+
+merged2 <- merge(merged1, cennik, by = "id_cennika")
+dane <- mutate(merged2,koszta=koszt_na_osobe * liczba_uczestników + liczba_wycieczek *koszt_podstawowy, przychód=cena_biletu * liczba_uczestników ,zysk=(cena_biletu - koszt_na_osobe) * liczba_uczestników - liczba_wycieczek *koszt_podstawowy) 
+
+wyniki <- select(dane,nazwa,liczba_wycieczek,liczba_uczestników,koszta,przychód,zysk)
+
+
+wyniki <- wyniki %>%
+  arrange(desc(liczba_wycieczek)) 
+
+popularne <- filter(wyniki,liczba_wycieczek==max(liczba_wycieczek))
+niepopularne <- filter(wyniki,liczba_wycieczek==min(liczba_wycieczek))
+if(length(popularne$nazwa)==1){
+  odp1c1 <- "najpopularniejszą wycieczką jest"
+  odp1c2 <- "która odbyła się"
+} else{
+  odp1c1 <- "najpopularniejszymi wycieczkami są"
+  odp1c2 <- "które odbyły się"
+}
+if(length(niepopularne$nazwa)==1){
+  odp2c1 <- "najmniej popularną wycieczką jest"
+  odp2c2 <- "która odbyła się tylko"
+} else{
+  odp2c1 <- "najmniej popularnymi wycieczkami są"
+  odp2c2 <- "które odbyły się tylko"
+}
+średni_zysk <-  mean(wyniki$zysk)
+nie_opłacalne <- filter(wyniki, zysk<średni_zysk/3)
+opłacalne <- filter(wyniki, zysk>2*średni_zysk)
+names(wyniki) <- c("Nazwa wycieczki", "Liczba wycieczek","Liczba uczestników","Koszt","Przychód","Zysk")
+kable(wyniki, caption = "Tabela z posortowanymi wycieczkami względem ich popularności")
+```
+
+Na powyższej tabeli możemy zauważyć, że `r odp1c1` **`r popularne$nazwa`**, `r odp1c2` **`r wyniki$'Liczba wycieczek'[1]`** razy, a `r odp2c1` **`r niepopularne$nazwa`**, `r odp2c2` **`r tail(wyniki$'Liczba wycieczek', n = 1)`** razy.
+
+Średni zysk ze wszystkich wycieczek wynosi **`r średni_zysk`**.
+
+Do najbardziej opłacalnych wycieczek z tabeli powyżej *(czyli mających zysk ponad 2 razy większy od średniej)* należą: **`r opłacalne$nazwa`**.
+
+Do najmniej opłacalnych wycieczek z tabeli powyżej *(czyli mających zysk ponad 3 razy mniejszy od średniej)* należą: **`r nie_opłacalne$nazwa`**.
+
+# Sporządź wykres liczby obsłużonych klientów w każdym miesiącu działalności firmy, czy firma rośnie, czy podupada?
+
+W analizie ograniczamy się do stycznia 2025 roku, aby mieć pełen zbiór informacji o liczbie klientów i zyskach w każdym miesiącu. Część wycieczek zaplanowanych na luty i marzec, w roku 2025, nie jest opłacona, stąd nie możemy wysnuć jednoznacznych wniosków.
+
+```{r klienci_miesiace }
+
+#Scalenie kolumn rok i miesiąc
+df_klienci_wszyscy %>% mutate(data = paste0(rok,"-",miesiac)) -> df_klienci_wszyscy_data 
+
+df_klienci_wszyscy_data$liczba_klientow <- as.numeric(df_klienci_wszyscy_data$liczba_klientow)
+df_klienci_wszyscy_data$data <- as.yearmon(df_klienci_wszyscy_data$data)
+df_odbyte_wycieczki<- df_klienci_wszyscy_data[df_klienci_wszyscy_data$data <= "2025-01",] #Obcninamy wycieczki do stycznia 2025 roku, aby miec podsumowanie pełnych miesięcy (opłata musi być do 14 dni przed rozpoczęciem wycieczki)
+
+najw_wart <- which(df_odbyte_wycieczki$liczba_klientow == max(df_odbyte_wycieczki$liczba_klientow))
+najm_wart <- which(df_odbyte_wycieczki$liczba_klientow == min(df_odbyte_wycieczki$liczba_klientow))
+kolory = rep("lightblue", length(df_odbyte_wycieczki$data))
+kolory[najm_wart] <- "red2"
+kolory[najw_wart] <- "green3"
+
+#Max i min liczba klientów
+liczba_najw_wart <- df_odbyte_wycieczki$liczba_klientow[najw_wart]
+liczba_najm_wart <- df_odbyte_wycieczki$liczba_klientow[najm_wart]
+
+najw_mies<- df_odbyte_wycieczki$data[c(najw_wart)]
+najmn_mies<- df_odbyte_wycieczki$data[c(najm_wart)]
+
+trend_klienci_wszyscy <- lm(liczba_klientow ~ as.numeric(data), data = df_odbyte_wycieczki) # funkcja która dopasowuje trend liniowy
+trend_klienci_wszyscy <- coef(trend_klienci_wszyscy)[2] # współczynnik kierunkowy
+if (trend_klienci_wszyscy > 0) {
+  trend_kl_wszyscy_odp <- "trend rosnący liczby obsłużonych klientów w analizowanym przedziale"
+} else if (trend_klienci_wszyscy < 0) {
+  trend_kl_wszyscy_odp <- "trend malejący liczby obsłużonych klientów w analizowanym przedziale"
+} else {
+  trend_kl_wszyscy_odp <- "trend, utrzymujący się na stałym poziomie"
+}
+
+# Tworzenie wykresu
+ggplot(df_odbyte_wycieczki, aes(x = data, y = liczba_klientow)) +
+  geom_col(fill = kolory) +
+  geom_smooth(method = "lm", color = "blue", linetype = "dashed", se = FALSE) +
+  labs(title = "Liczba obsłużonych klientów w każdym miesiącu działalności firmy",
+       x = "Data",
+       y = "Liczba klientów")+
+  scale_x_continuous(breaks=as.numeric(df_odbyte_wycieczki$data), labels=format(df_odbyte_wycieczki$data,"%Y %m")) +
+  scale_y_continuous(labels = scales::comma) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Obrót etykiet osi X
+
+```
+
+Na powyższym wykresie możemy zauważyć `r trend_kl_wszyscy_odp`. Największa wartość **`r liczba_najw_wart`** jest osiągana w miesiącach: **`r paste(najw_mies, collapse = ", ")`**. Najmniejsza wartość to natomiast **`r liczba_najm_wart`** i jest osiągana w miesiącach: **`r paste(najmn_mies, collapse = ", ")`**.
+
+```{r unikatowi_klienci_miesiace}
+
+#Scalenie kolumn rok i miesiąc
+df_klienci_unikatowi %>% mutate(data = paste0(rok,"-",miesiac)) -> df_klienci_unikatowi_data 
+
+df_klienci_unikatowi_data$liczba_klientow <- as.numeric(df_klienci_unikatowi_data$liczba_klientow)
+df_klienci_unikatowi_data$data <- as.yearmon(df_klienci_unikatowi_data$data)
+df_klienci_unikatowi_odbyte <- df_klienci_unikatowi_data[df_klienci_unikatowi_data$data <= '2025-01',]
+
+najw_wart_uq <- which(df_klienci_unikatowi_odbyte$liczba_klientow == max(df_klienci_unikatowi_odbyte$liczba_klientow))
+najm_wart_uq <- which(df_klienci_unikatowi_odbyte$liczba_klientow == min(df_klienci_unikatowi_odbyte$liczba_klientow))
+kolory = rep("lightblue", length(df_klienci_unikatowi_odbyte$data))
+kolory[najm_wart_uq] <- "red2"
+kolory[najw_wart_uq] <- "green3"
+
+
+liczba_najw_wart_uq <- df_klienci_unikatowi_odbyte$liczba_klientow[najw_wart_uq]
+liczba_najm_wart_uq <- df_klienci_unikatowi_odbyte$liczba_klientow[najm_wart_uq]
+
+najw_mies_uq<- df_klienci_unikatowi_odbyte$data[c(najw_wart_uq)]
+najmn_mies_uq<- df_klienci_unikatowi_odbyte$data[c(najm_wart_uq)]
+
+
+trend_klienci_uq <- lm(liczba_klientow ~ as.numeric(data), data = df_klienci_unikatowi_odbyte) # funkcja która dopasowuje trend liniowy
+trend_klienci_uq <- coef(trend_klienci_uq)[2] # współczynnik kierunkowy
+if (trend_klienci_uq > 0) {
+  trend_klienci_uq_odp <- "trend rosnący liczby obsłużonych klientów w analizowanym przedziale"
+} else if (trend_klienci_uq < 0) {
+  trend_klienci_uq_odp <- "trend malejący liczby obsłużonych klientów w analizowanym przedziale"
+} else {
+  trend_klienci_uq_odp <- "trend, utrzymujący się na stałym poziomie"
+}
+
+
+# Tworzenie wykresu
+ggplot(df_klienci_unikatowi_odbyte, aes(x = data, y = liczba_klientow)) +
+  geom_col(fill = kolory) +
+  geom_smooth(method = "lm", color = "blue", linetype = "dashed", se = FALSE) +
+  labs(title = "Liczba obsłużonych unikatowych klientów w każdym miesiącu działalności firmy",
+       x = "Data",
+       y = "Liczba klientów")+
+  scale_x_continuous(breaks=as.numeric(df_klienci_unikatowi_odbyte$data), labels=format(df_klienci_unikatowi_odbyte$data,"%Y %m")) +
+  scale_y_continuous(labels = scales::comma) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Obrót etykiet osi X
+```
+
+Biorąc pod uwagę jedynie unikatowych klientów w danym miesiącu, tzn. liczymy jedynie udział danego klienta w jakiejkolwiek wycieczce w miesiącu, możemy zauważyć `r trend_klienci_uq_odp`. Największa liczba obsłużonych unikatowych klientów **`r liczba_najw_wart_uq`** jest osiągana w miesiącach: `r paste(najw_mies_uq, collapse = ", ")`. Najmniejsza wartość to natomiast **`r liczba_najm_wart_uq`** i jest osiągana w miesiącach: `r paste(najmn_mies_uq, collapse = ", ")`. 
+
+
+```{r miesieczne_oplaty_pracownikow}
+kable(df_oplaty_pracownikow, caption="Miesięczne opłaty pracowników firmy", col.names=c("Liczba pracowników", "Miesięczne opłaty wynagrodzeń"))
+```
+
+
+```{r zyski_miesiace}
+df_zysk_wszystko %>% mutate(data = paste0(rok,"-",miesiac)) -> df_zysk_wszystko_data 
+
+df_zysk_wszystko_data$zysk <- as.numeric(df_zysk_wszystko_data$zysk)
+df_zysk_wszystko_data$data <- as.yearmon(df_zysk_wszystko_data$data)
+df_zysk_faktyczny <- df_zysk_wszystko_data[df_zysk_wszystko_data$data <= "2025-01",]
+
+najw_zysk <- which(df_zysk_faktyczny$zysk == max(df_zysk_faktyczny$zysk))
+najm_zysk <- which(df_zysk_faktyczny$zysk == min(df_zysk_faktyczny$zysk))
+kol = rep("steelblue", length(df_zysk_faktyczny$data))
+kol[najw_zysk] <- "green3"
+kol[najm_zysk] <- "red"
+
+
+liczba_najw_zysk <- df_zysk_faktyczny$zysk[najw_zysk]
+liczba_najmn_zysk <- df_zysk_faktyczny$zysk[najm_zysk]
+
+najw_mies_zysk<- df_zysk_faktyczny$data[c(najw_zysk)]
+najmn_mies_zysk<- df_zysk_faktyczny$data[c(najm_zysk)]
+
+
+trend_zysk <- lm(zysk ~ as.numeric(data), data = df_zysk_faktyczny) # funkcja która dopasowuje trend liniowy
+trend_zysk <- coef(trend_zysk)[2] # współczynnik kierunkowy
+if (trend_zysk > 0) {
+  trend_zysk_odp <- "trend rosnący zysków firmy w analizowanym przedziale"
+} else if (trend_zysk < 0) {
+  trend_zysk_odp <- "trend malejący zysków firmy w analizowanym przedziale"
+} else {
+  trend_zysk_odp <- "trend, utrzymujący się na stały poziomie"
+}
+
+
+# Tworzenie wykresu
+ggplot(df_zysk_faktyczny, aes(x = data, y = zysk) ) +
+  geom_col(fill = kol) +
+  geom_smooth(method = "lm", color = "magenta2", linetype = "dashed", se = FALSE) +
+  labs(title = "Zyski firmy w każdym miesiącu działalności",
+       x = "Data",
+       y = "Wartość [zł]") +
+  scale_x_continuous(breaks=as.numeric(df_zysk_faktyczny$data), labels=format(df_zysk_faktyczny$data,"%Y %m")) +
+  scale_y_continuous(labels = scales::comma) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_hline(yintercept = df_oplaty_pracownikow$miesieczne_oplaty_wynagrodzen
+, color = "black", linetype = "dotted", size = 1)
+```
+
+```{r zadanie_2_wnioski}
+ile_razy_straty <- length(df_zysk_faktyczny$zysk[df_zysk_faktyczny$zysk <df_oplaty_pracownikow$miesieczne_oplaty_wynagrodzen])
+
+if (ile_razy_straty==0) {
+  straty_odp <- "W żadnym miesiącu firma nie poniosła strat (zyski zawsze były większe od kosztów prowadzenia działalności)"
+} else {
+  straty_odp <- paste(" W", ile_razy_straty ,"miesiącach zyski nie wystarczyły do opłacenia pracowników")
+}
+
+if (trend_zysk>0 & trend_klienci_wszyscy>0) {
+  odp_zad_2 <- "firma rozrasta się. Rośnie liczba obsługowanych klientów, jaki i zyski, które firma uzyskuje w kolejnych miesiącach."
+} else if (trend_zysk>0 & trend_klienci_wszyscy<0){
+  odp_zad_2 <- "pomimo rosnących zysków w każdym miesiącu, firma nie przyciąga do siebie nowych klientów. W dłuższym rozrachunku, firma może orgazniować zbyt mało wycieczek, aby opłacić koszta swojej działalności. Potrzebne są zmiany, które zachęcą większą liczbę klientów do brania udziału w wydarzeniach."
+} else if (trend_zysk<0 & trend_klienci_wszyscy>0){
+  odp_zad_2 <- "pomimo rosnącej liczby klientów w każdym miesiącu, zyski maleją. Pomimo coraz większego zainteresowania wycieczkami, firma może nie być w stanie ich organizować. Przy dłuższym utrzymaniu się obecnych trendów, firma może upaść."
+} else {
+  odp_zad_2 <- "firma upada. Zarówno liczba obsługiwanych klientów, jak i zyski, maleją z miesiąca na miesiąc. Potrzebne są zmiany, które zarówno przyciągną nowych klientów, jak i zwiększą zyski z organizowanych wydarzeń"
+}
+```
+
+Analizując zyski możemy zauważyć `r trend_zysk_odp`. Największy zysk (**`r liczba_najw_zysk`** zł) firma uzyskała w miesiacach: `r paste(najw_mies_zysk, collapse = ", ")`. Najmniejszy zysk (**`r liczba_najmn_zysk`** zł) zanotowano w miesiącach: `r paste(najmn_mies_zysk, collapse = ", ")`.Czarna kropkowana linia na wykresie wyznacza sumę wartości wszystkich wypłat pracowników w danym miesiącu.`r straty_odp`.
+
+Ostatecznie możemy stwierdzić, że `r odp_zad_2`
+
+# Sprawdź, po których wycieczkach klienci wracają na kolejne, a po których mają dość i więcej ich nie widzicie. Czy są takie, które być może powinny zniknąć z oferty?
+
+Poniższy wykres przedstawia histogram współczynników powrotów klientów z wycieczek definiowany jako:
+
+$$Współczynnik\ powrotu = 1 - \frac{\text{Liczba klientów, dla których dana oferta była ostatnią}}{\text{Liczba klientów, którzy uczestniczyli kiedykolwiek w tej ofercie}}$$
+
+
+``` {r wracajacy_klienci}
+df3.1$id <- row.names(df3.1)
+
+ggplot(df3.1, aes(x = factor(id_oferty), y = return_rate)) +
+  geom_bar(stat = "identity", fill = "red2", color = "black", width = 0.6) +
+  geom_text(aes(label = sprintf("%.2f", return_rate)), 
+            vjust = 0.3, hjust = -0.3, color = "black", size = 4, angle = 90) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16),
+    axis.text.x = element_text(vjust = 0.5, hjust = 0.5, angle = 90, size = 12, margin = margin(t = 5)),
+    axis.ticks.x = element_line(size = 0.5)  # Dodajemy linie dla ticków na osi X
+  ) +
+  labs(
+    title = "Ranking wydarzeń wg współczynnika powrotu",
+    y = "Współczynnik powrotu",
+    x = "Oferty"
+  ) +
+  ylim(0, max(df3.1$return_rate) + 0.1)
+```
+
+Oznaczenie wycieczek znajduje się w poniższej tabeli.
+
+``` {r tabela_wracajacy_klienci}
+
+df3.1 <- df3.1[, c("id","nazwa", "return_rate")]
+
+df3.1 <- df3.1[order(df3.1$return_rate, decreasing = TRUE), ]
+
+#kable(df3.1, col.names = c("Numer wydarzenia","Nazwa", "Współczynnik powrotu"), caption = "Tabela z wynikami współczynnika powrotu")
+
+best_wycieczka <- df3.1[1, 2]
+best_wycieczka_rr <- df3.1[1, 3] 
+
+worst_wycieczka <- df3.1[nrow(df3.1), 2]
+worst_wycieczka_rr <- df3.1[nrow(df3.1), 3]
+
+mean_rr <- mean(df3.1$return_rate)
+
+stosunek <- worst_wycieczka_rr / mean_rr
+
+if (stosunek < 0.5) {
+  odp1 <- "Zalecamy rozważenie wykluczenia tej wycieczki z naszej oferty, ponieważ może ona negatywnie wpływać na lojalność klientów."
+} else {
+  odp1 <- "Nie ma obecnie wystarczających przesłanek, by wykluczyć tę wycieczkę z oferty."
+}
+
+```
+
+Wycieczką, po której najwięcej klientów wraca, jest `r best_wycieczka`, dla której współczynnik powrotu wynosi `r round(best_wycieczka_rr, 4)`. W związku z tym powinniśmy promować ją jako idealną ofertę dla początkujących turystów.
+
+Z kolei wycieczka `r worst_wycieczka`, dla której współczynnik powrotu wynosi `r round(worst_wycieczka_rr, 4)`, powoduje, że wielu klientów decyduje się na rezygnację z dalszego korzystania z naszych usług.
+
+Średni współczynnik powrotu dla wszystkich wycieczek wynosi `r round(mean_rr, 4)`.
+
+Współczynnik powrotu wycieczki, która jest najmniej popularna, stanowi `r round(stosunek * 100, 2)`% średniej wartości współczynnika powrotu w całej ofercie. `r odp1`
+
+Należy jednak zwrócić uwagę na fakt że znaczna część naszych klientów odbyła jedną lub dwie wycieczki co zostało przedstawione w poniższej tabeli.
+
+
+``` {r tabela_klienci_wycieczki}
+df3.2$procent_skumulowany <- round(cumsum(df3.2$liczba_osob) / sum(df3.2$liczba_osob) * 100, 2)
+
+trzy <- df3.2$procent_skumulowany[3]
+
+kable(df3.2, 
+      col.names = c("Wycieczki na osobę", "Liczba osób", "Procent skumulowany"),
+      caption = "Tabela z wycieczkami i procentem skumulowanych osób")
+```
+
+Jak widać w tabeli aż `r round(trzy, 2)`% naszych klientów wzieło udział w trzech lub mniejszej liczbie wycieczek.
+
+# Który plan wycieczek i która konkretna wycieczka mają najlepszą, a które najgorszą średnią ocenę? Czy warto zrezygnować z najgorzej ocenianej oferty?
+
+```{r najgorsza_wycieczka}
+kable(najgorsze_wyc, caption="Najgorzej oceniane wycieczki", col.names=c("ID wycieczki", "Nazwa wycieczki", "Średnia ocena"))
+
+najgorsza_ocena <- min(najgorsze_wyc$srednia_ocena_wycieczki)
+id_wyc <- najgorsze_wyc[najgorsze_wyc$srednia_ocena_wycieczki==najgorsza_ocena, ]$id_wycieczki
+
+if(length(id_wyc)==1){
+  tekst <- paste0("Najgorzej oceniana wycieczka to ", id_wyc, "; Ocena: ", najgorsza_ocena, ".")
+} else{
+  tekst <- paste0("Najgorzej oceniane wycieczki to ", paste(id_wyc, collapse = ", "), "; Ocena: ", najgorsza_ocena, ".")
+}
+```
+
+`r tekst`
+
+```{r najlepsza_wycieczka}
+kable(najlepsze_wyc, caption="Najlepiej oceniane wycieczki", col.names=c("ID wycieczki", "Nazwa wycieczki", "Średnia ocena"))
+
+najlepsza_ocena <- max(najlepsze_wyc$srednia_ocena_wycieczki)
+id_wyc <- najlepsze_wyc[najlepsze_wyc$srednia_ocena_wycieczki==najlepsza_ocena, ]$id_wycieczki
+
+if(length(id_wyc)==1){
+  tekst <- paste0("Najlepiej oceniana wycieczka to ", id_wyc, "; Ocena: ", najlepsza_ocena, ".")
+} else{
+  tekst <- paste0("Najlepiej oceniane wycieczki to ", paste(id_wyc, collapse = ", "), "; Ocena: ", najlepsza_ocena, ".")
+}
+```
+
+`r tekst`
+
+```{r oferty}
+oceny_of <- oferty$srednia_ocena_ofert
+
+max_of <- oceny_of[1]
+min_of <- oceny_of[1]
+indeksy_max_of <- 1
+indeksy_min_of <- 1
+for(i in 2:length(oceny_of)){
+  if(oceny_of[i]==max_of){
+    indeksy_max_of <- c(indeksy_max_of, i)
+  }
+  else if(oceny_of[i]>max_of){
+    max_of <- oceny_of[i]
+    indeksy_max_of <- i
+  }
+  
+  if(oceny_of[i]==min_of){
+    indeksy_min_of <- c(indeksy_min_of, i)
+  }
+  else if(oceny_of[i]<min_of){
+    min_of <- oceny_of[i]
+    indeksy_min_of <- i
+  }
+}
+
+kolory_of <- c()
+for(i in 1:length(oceny_of)){
+  if(i %in% indeksy_max_of) kolory_of <- c(kolory_of, "green4")
+  else if(i %in% indeksy_min_of) kolory_of <- c(kolory_of, "red4")
+  else kolory_of <- c(kolory_of, "lightblue3")
+}
+if(max_of==min_of) kolory_of <- "lightblue3"
+
+ggplot(oferty, aes(x = id_oferty, y = srednia_ocena_ofert)) +
+  geom_col(fill = kolory_of) +
+  labs(title = "Średnia ocena ofert",
+       x = "ID oferty",
+       y = "Średnia ocena")+
+  scale_x_continuous(breaks=as.numeric(oferty$id_oferty)) +
+  scale_y_continuous(labels = scales::comma) +
+  theme(axis.text.x = element_text(angle = 90, hjust = .5))
+
+if(length(indeksy_max_of)==1){
+  tekst1 <- paste0("Najlepsza ocena oferty (oznaczona na zielono) to ", max_of, ".")
+} else{
+  tekst1 <- paste0("Najlepsza ocena ofert (oznaczone na zielono) to ", max_of, ".")
+}
+
+if(min_of<=2.5 & length(indeksy_min_of)==1){
+  tekst2 <- paste0("Najgorsza ocena oferty (oznaczona na czerwono) to ", min_of, " i jest na tyle niska, że warto z niej zrezygnować lub zmienić ją od podstaw.")
+} else if(min_of>2.5 & length(indeksy_min_of)==1){
+  tekst2 <- paste0("Najgorsza ocena oferty (oznaczona na czerwono) to ", min_of, ", ale nie jest za niska, warto po prostu wprowadzić w niej pewne zmiany.")
+} else if(min_of<=2.5 & length(indeksy_min_of)>1){
+  tekst2 <- paste0("Najgorsza ocena ofert (oznaczon3 na czerwono) to ", min_of, " i jest na tyle niska, że warto z nich zrezygnować lub zmienić je od podstaw.")
+} else{
+  tekst2 <- paste0("Najgorsza ocena ofert (oznaczone na czerwono) to ", min_of, ", ale nie jest za niska, warto po prostu wprowadzić w nich pewne zmiany.")
+}
+```
+
+`r tekst1`  
+`r tekst2`
+
+# Czy są nieodpowiedzialni klienci, który pojechali na wycieczkę z osobą, którą mają podaną jako osobę kontaktową w przypadku wypadku?
+
+``` {r nieodpowiedzialni_klienci_tekst1}
+if(nrow(df5) == 0){
+  tekst <- "Na szczęście nie ma tak nieodpowiedzialnych klientów."
+} else{
+  tekst <- "Okazuje się że znajdują się tacy klienci. Ich dane przedstawiono w poniższej tabeli."
+}
+```
+
+`r tekst`
+
+```{r nieodpowiedzialni_klienci_tabela}
+if(nrow(df5)>0){
+  kable(df5,
+        col.names = c("ID wycieczki", "Imię klienta", "Nazwisko klienta", "Email klienta", "Imię osoby kontaktowej", "Nazwisko osoby kontaktowej"),
+        caption = "Tabela z danymi klienta i osoby kontaktowej")
+}
+```
+
+``` {r nieodpowiedzialni_klienci_tekst2}
+if(nrow(df5) == 0){
+  tekst <- ""
+} else{
+  tekst <- "Powinniśmy wysłać na ich elektronicznie skrzynki pocztowe prośbę o aktualizację danych."
+}
+```
+
+`r tekst`
+
+# Którzy koordynatorzy i fotografowie przyczynili się do największych zysków firmy? Komu powinniśy dać podwyżkę?
+
+W tej części przeanalizujmy, jak plasowały się zarobki naszych pracowników każdego miesiaca, oraz który koordynator i fotograf uczestniczył w najbardziej zyskownych wycieczkach.
+
+Poniższy histogram ilustruje łączny zysk każdej wycieczki, w której uczestniczył dany koordynator, w poszczególnych miesiącach. Widać, że jedynymi wyraźnymi zmianami są okresy, gdy niektórzy pracownicy brali udział w wyjątkowo dochodowych lub mniej rentownych wycieczkach. Poza tymi momentami, zmiany zysków są trudne do zaobserwowania.
+
+``` {r koordynatorzy_jeden}
+df6.1$data_rok_miesiac <- paste(df6.1$rok, df6.1$miesiac, sep = "-")
+df6.1$imie <- str_to_title(df6.1$imie)
+df6.1$nazwisko <- str_to_title(df6.1$nazwisko)
+
+ggplot(df6.1, aes(x = as.Date(paste(data_rok_miesiac, "01", sep = "-")), y = zysk, fill = paste(imie, nazwisko))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Data", y = "Zysk", title = "Zysk Koordynatorów każdego miesiąca") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "1 month") +
+  guides(fill = guide_legend(title = "Koordynator"))
+```
+
+Zestawmy teraz łączny zysk każdego koordynatora od momentu rozpoczęcia pracy. To pozwoli nam zobaczyć ogólny wpływ ich działalności na wyniki finansowe, uwzględniając wszystkie wycieczki, w których brali udział, od samego początku ich pracy.
+
+``` {r koordynatorzy_dwa}
+df_summary <- df6.1 %>%
+  group_by(imie, nazwisko) %>%
+  summarise(suma_zyskow = sum(zysk))
+
+ggplot(df_summary, aes(x = paste(imie, nazwisko), y = suma_zyskow, fill = paste(imie, nazwisko))) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(
+    x = "Koordynator",
+    y = "Suma Zysków",
+    title = "Suma Zysków Koordynatorów"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+# najlepszy i nagroszy
+
+best_score <- max(df_summary$suma_zyskow)
+best_worker <- paste(df_summary$imie[which.max(df_summary$suma_zyskow)], df_summary$nazwisko[which.max(df_summary$suma_zyskow)])
+
+worst_score <- min(df_summary$suma_zyskow)
+worst_worker <- paste(df_summary$imie[which.min(df_summary$suma_zyskow)], df_summary$nazwisko[which.min(df_summary$suma_zyskow)])
+```
+
+Jak się okazuje, największe zarobki osiągnęła osoba koordynująca `r best_worker`, której łączny zarobek wyniósł `r best_score` złotych. Z kolei najmniejsze zarobki miała osoba koordynująca `r worst_worker`, której łączny zarobek wyniósł jedynie `r worst_score` złotych.
+
+Jako że każdy pracownik jest zatrudniony na takich samych warunkach i otrzymuje taką samą wypłatę, to premię powinna dostać osoba koordynująca `r best_worker`.
+
+Dokonajmy takiej samej analizy dla fotografów.
+
+Poniższy histogram ilustruje łączny zysk każdej wycieczki, w której uczestniczył dany fotograf, w poszczególnych miesiącach.
+
+``` {r fotografowie_jeden}
+df6.2$data_rok_miesiac <- paste(df6.2$rok, df6.2$miesiac, sep = "-")
+df6.2$imie <- str_to_title(df6.2$imie)
+df6.2$nazwisko <- str_to_title(df6.2$nazwisko)
+
+ggplot(df6.2, aes(x = as.Date(paste(data_rok_miesiac, "01", sep = "-")), y = zysk, fill = paste(imie, nazwisko))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Data", y = "Zysk", title = "Zysk Fotografów każdego miesiąca") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "1 month") +
+  guides(fill = guide_legend(title = "Fotograf"))
+```
+``` {r fotografowie_dwa}
+df_summary <- df6.2 %>%
+  group_by(imie, nazwisko) %>%
+  summarise(suma_zyskow = sum(zysk))
+
+ggplot(df_summary, aes(x = paste(imie, nazwisko), y = suma_zyskow, fill = paste(imie, nazwisko))) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(
+    x = "Fotograf",
+    y = "Suma Zysków",
+    title = "Suma Zysków Fotografów"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+# najlepszy i nagroszy
+
+best_score <- max(df_summary$suma_zyskow)
+best_worker <- paste(df_summary$imie[which.max(df_summary$suma_zyskow)], df_summary$nazwisko[which.max(df_summary$suma_zyskow)])
+
+worst_score <- min(df_summary$suma_zyskow)
+worst_worker <- paste(df_summary$imie[which.min(df_summary$suma_zyskow)], df_summary$nazwisko[which.min(df_summary$suma_zyskow)])
+```
+
+Spośród fotografów największy zarobek zawdzięczamy `r best_worker`, wynoszący `r best_score` złotych. Najgorszy natomiast `r worst_worker`, wynoszący `r worst_score` złotych.
+
+Warto jednak pamiętać, że zysk firmy nie jest wynikiem tylko ich pracy – to efekt zaangażowania wszystkich pracowników.
+
+# Na jakie plany wycieczek nowi klienci decydują się najczęściej, a na jakie weterani wycieczek?
+
+Wcześniej analizowaliśmy, ile osób po pierwszej wycieczce decyduje się na kolejne, ale która oferta przyciąga do nas najwięcej nowych klientów?
+
+```{r zadanie7_wykres1}
+colors <- rep("royalblue3", times = nrow(df7.1.oferty.n))
+colors[[najpopularniejsza.pierwsza]] <- "green3"
+
+alphas <- rep(.7, times = nrow(df7.1.oferty.n))
+alphas[[najpopularniejsza.pierwsza]] <- 1
+
+ggplot(df7.1, aes(x = oferta)) + 
+  geom_bar(fill = colors, alpha = alphas) +
+  xlab("Oferta") +
+  ylab("Liczba pierwszych wyjazdów uczestników") +
+  ggtitle("Na jaką wycieczkę decydują się nowi klienci?") +
+  theme_light()
+```
+
+Można zauważyć, że najpopularniejszą wycieczką dla nowych klientów jest `r najpopularniejsza.pierwsza.nazwa`. Spośród `r df7.3` osób wybrało ją aż `r df7.1.oferty.n$liczba_wystapien[[1]]` klientów!
+
+```{r zadanie7_wykres2}
+colors[[najpopularniejsza.potem]] <- "green4"
+alphas[[najpopularniejsza.potem]] <- 1
+
+ggplot(df7.2, aes(x = oferta)) + 
+  geom_bar(fill = colors, alpha = alphas) +
+  xlab("Oferta") +
+  ylab("Liczba późniejszych wyjazdów uczestników") +
+  ggtitle("Najpopularniejsze kolejne wycieczki") +
+  theme_light()
+
+txt7 <- ""
+if(najpopularniejsza.pierwsza != najpopularniejsza.potem){
+  txt7 <- paste0("Jasnym zielonym zaznaczona jest ", najpopularniejsza.pierwsza.nazwa, ", wyznaczona wcześniej.")
+}
+```
+
+Ciemniejszym zielonym zaznaczona jest oferta "`r najpopularniejsza.potem.nazwa`", która jest wybierana przez klientów, którzy odbyli już u nas wcześniej wycieczki. `r txt7` Możemy spróbować bardziej rozpromować te oraz być może podobne oferty.
+
+# Planujemy nowy plan marketingowy, majacy na celu zwiększyć liczbę klientów. Którzy klienci dawno nie pojechali na żadną wycieczkę i powinni być targetem celu marketingowego?
+
+Poniższy wykres przedstawia histogram liczby klientów w zależności od liczby dni, które upłynęły od ich ostatniej wycieczki. Argumenty ujemne oznaczają klientów, którzy są zaplanowani na wycieczki w przyszłości.
+
+``` {r dawno_nie_pojechali}
+df8.2$licznosc <- as.numeric(df8.2$licznosc)
+
+breaks <- seq(min(df8.2$dni_od_ostatniej_wycieczki), max(df8.2$dni_od_ostatniej_wycieczki), length.out = 30 + 1)
+
+results <- numeric(length(breaks) - 1)
+
+for (i in seq_along(results)) {
+  lower <- breaks[i]
+  upper <- breaks[i + 1]
+  
+  results[i] <- sum(
+    df8.2$licznosc[df8.2$dni_od_ostatniej_wycieczki >= lower & 
+                     df8.2$dni_od_ostatniej_wycieczki < upper]
+  )
+}
+
+ggplot(df8.2, aes(x = dni_od_ostatniej_wycieczki, weight = licznosc)) +
+  geom_histogram(
+    breaks = breaks, 
+    fill = "steelblue", 
+    color = "black", 
+    linewidth = 0.5
+  ) +
+  scale_x_continuous(
+    breaks = breaks,
+    labels = label_number(scale = 1)
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5)
+  ) +
+  labs(
+    x = "Dni od ostatniej wycieczki",
+    y = "Liczba Klientów"
+  )
+
+```
+
+Te same wyniki zostały przedstawione w tabeli.
+
+``` {r}
+range_labels <- paste0(
+  "[", round(breaks[-length(breaks)], 0), 
+  ", ", round(breaks[-1], 0), ")"
+)
+
+table_result <- data.frame(
+  Zakres = range_labels,
+  Licznosc = results
+)
+kable(
+  table_result, 
+  col.names = c("Zakres", "Liczność")
+)
+```
+
+Nie widać wyraźnych skoków sezonowych w liczbie klientów w żadnym z przedziałów czasowych, co może sugerować, że klienci są raczej równomiernie rozproszeni w czasie, co może wskazywać na brak długoterminowego utrzymywania klientów, spowodowanych zapewne brakiem utrzymania długoterminowcyh relacji z klientami. W celu jej poprawy można rozpocząc kampanię marketingową w mediach lub zainwestować w programy lojalnościowe, które zachęcałyby klientów do częstszych powrotów. Dodatkowo, warto rozważyć wprowadzenie zniżek lub promocji uzależnionych od liczby odbytych wycieczek lub czasu, który upłynął od ostatniej.
+
+
+# Którzy pracownicy mieli urlopy w momentach największej organizacji wycieczek? Czy ich nieobecność wpłynęła na jakość obsługi lub organizację? Czy powinniśmy zatrudnić nowego pracownika?
+
+``` {r zasoby_łódzkie}
+df9.1[, 4] <- as.numeric(df9.1[, 4])
+df9.2[, 4] <- as.numeric(df9.2[, 4])
+
+full_dates <- seq(min(df9.1$dzien), max(df9.1$dzien), by = "day")
+
+df_complete <- data.frame(dzien = full_dates)
+
+df9.1 <- merge(df_complete, df9.1, by = "dzien", all.x = TRUE)
+df9.2 <- merge(df_complete, df9.2, by = "dzien", all.x = TRUE)
+
+df9.1[is.na(df9.1)] <- 0
+df9.2[is.na(df9.2)] <- 0
+
+df9.1$srednia_ruchoma <- stats::filter(df9.1[, 4], rep(1/11, 11), sides = 2)
+df9.2$srednia_ruchoma <- stats::filter(df9.2[, 4], rep(1/11, 11), sides = 2)
+
+liczba_koordynatorow <- df8.3$liczba_pracownikow[1]
+liczba_fotografow <- df8.3$liczba_pracownikow[2]
+
+kordynatorzy_all_works <- sum(df9.1[,4] == liczba_koordynatorow)
+fotografowie_all_works <- sum(df9.2[,4] == liczba_fotografow)
+
+kordynatorzy_mean <- mean(df9.1[,4])
+fotografowie_mean <- mean(df9.2[,4])
+```
+
+Na poniższym wykresie przedstawiono zależność liczby pracowników na wyjeździe, na urlopie, na wyjeździe lub na urlopie oraz średnią ruchomą z pięciu dni wstecz i w przód.
+
+``` {r koordynatorzy_all}
+ggplot(df9.1) +
+  geom_point(aes(x = dzien, y = suma_pracownikow, color = "Wyjazd lub urlop"), size = 1) +
+  geom_line(aes(x = dzien, y = srednia_ruchoma, color = "Średnia ruchoma"), size = 1) +
+  labs(x = "Data", y = "Liczba koordynatorów") +
+  theme_minimal() +
+  scale_x_date(
+    breaks = "1 month",
+    labels = scales::date_format("%d-%m-%Y")
+  ) +
+  scale_color_manual(
+    values = c("Wyjazd lub urlop" = "black", "Średnia ruchoma" = "red")
+  ) +
+  guides(color = guide_legend(title = "Kategoria")) + 
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "bottom"
+  ) +
+  ggtitle("Liczba koordynatorów na wyjazdach lub urlopach")
+```
+
+Średnia liczba koordynatorów na wycieczkach lub urlopach oscyluje wokół wartości średniej `r round(kordynatorzy_mean, 2)`. Natomiast dni kiedy to każdy koordynator był czymś zajęty (wyjazdem lub urlopem) wynosi `r kordynatorzy_all_works`.
+
+Dokonajmy podobnej analizy dla fotografów.
+
+``` {r fotopedaly_all}
+ggplot(df9.2) +
+  geom_point(aes(x = dzien, y = suma_pracownikow, color = "Wyjazd lub urlop"), size = 1) +
+  geom_line(aes(x = dzien, y = srednia_ruchoma, color = "Średnia ruchoma"), size = 1) +
+  labs(x = "Data", y = "Liczba fotografów") +
+  theme_minimal() +
+  scale_x_date(
+    breaks = "1 month",
+    labels = scales::date_format("%d-%m-%Y")
+  ) +
+  scale_color_manual(
+    values = c( "Wyjazd lub urlop" = "black", "Średnia ruchoma" = "red")
+  ) +
+  guides(color = guide_legend(title = "Kategoria")) + 
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "bottom"
+  ) +
+  ggtitle("Liczba fotografów na wyjazdach lub urlopach")
+```
+
+Średnia liczba fotografów na wycieczkach lub urlopach oscyluje wokół wartości średniej `r round(fotografowie_mean, 2)`. Natomiast dni kiedy to każdy koordynator był czymś zajęty (wyjazdem lub urlopem) wynosi `r fotografowie_all_works`.
